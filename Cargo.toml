@@ -1,0 +1,15 @@
+[package]
+name = "
+llm_inference"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+mistralrs = { git = "https://github.com/EricLBuehler/mistral.rs.git" }
+tokenizers = "0.22.1"
+serde = "1.0.228"
+serde_json = "1.0.145"
+thiserror = "1.0.69"
+tokio = "1.47.1"
+
