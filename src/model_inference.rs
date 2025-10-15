@@ -1,12 +1,12 @@
+use crate::parse;
 use anyhow::{Context, Result};
-use mistralrs::{ChatCompletionChunkResponse, ChunkChoice, Delta, Response};
 use mistralrs::{
-    Device, IsqType, PagedAttentionMetaBuilder, RequestBuilder, StopTokens, TextMessageRole,
-    TextMessages, TextModelBuilder,DeviceMapSetting,Model,AutoDeviceMapParams
+    AutoDeviceMapParams, Device, DeviceMapSetting, IsqType, Model, PagedAttentionMetaBuilder,
+    RequestBuilder, StopTokens, TextMessageRole, TextMessages, TextModelBuilder,
 };
+use mistralrs::{ChatCompletionChunkResponse, ChunkChoice, Delta, Response};
 use parse::Args;
 use tokio::io::{stdout, AsyncWriteExt};
-use crate::parse;
 
 fn parse_device(s: &str) -> Device {
     match s.to_lowercase().as_str() {
@@ -17,41 +17,23 @@ fn parse_device(s: &str) -> Device {
 }
 
 pub async fn run(args: Args) -> Result<()> {
-    //    - local: model_dir/model_name
-    //    - downbload
-    let model_id = {
-        if args.model_name.contains('/') {
-            args.model_name.clone()
-        } else {
-            let p = args.model_dir.join(&args.model_name);
-            p.to_string_lossy().to_string()
-        }
-    };
-    
+    // format : hf id
+    // if exist, load from local cache else download and load
+    let model_id = &args.model_name;
+
     let builder = TextModelBuilder::new(model_id)
         .with_device(parse_device(&args.device))
-        .with_isq(IsqType::Q8_0) 
+        .with_isq(IsqType::Q4_0)
         .with_logging()
-        .with_paged_attn(|| PagedAttentionMetaBuilder::default().build())?; 
+        .with_paged_attn(|| PagedAttentionMetaBuilder::default().build())?;
 
     let model = builder
         .build()
         .await
         .context("failed to build/load model")?;
 
-    // let devmap = DeviceMapSetting::Auto(AutoDeviceMapParams::Text {
-    //     max_seq_len: 128,     
-    //     max_batch_size: 1,
-    // });
-    //
-    // let model = TextModelBuilder::new("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
-    //     .with_device(Device::Cpu)
-    //     .with_device_mapping(devmap)
-    //     .with_isq(IsqType::Q4_0)   
-    //     .with_no_kv_cache()        
-    //     .build().await?;
     println!("model loaded");
-    
+
     let messages = TextMessages::new().add_message(TextMessageRole::User, &args.prompt);
 
     let mut req = RequestBuilder::from(messages)
