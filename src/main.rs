@@ -6,9 +6,12 @@ use std::env;
 async fn main() -> Result<()> {
     env::set_var("RUST_BACKTRACE", "1");
 
+
+
+    //  TinyLlama/TinyLlama-1.1B-Chat-v1.0
     let json = r#"
 {
-  "model-name": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+  "model-name": "Qwen/Qwen3-0.6B",
   "model-dir": "models/",
   "prompt": "Explain ownership",
   "max_token": 64,
