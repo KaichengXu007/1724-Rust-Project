@@ -1,3 +1,10 @@
+// CLI binary for model inference.
+// This program parses a JSON args object (parse::parse_args) and runs the model_inference::run
+// function which streams output to stdout. It is primarily the original M1 CLI that this
+// project adapts to a server-based interface via the engine/adapter layer.
+//
+// Recent changes: added stream-producing API in model_inference and tests to allow server
+// integration without changing the CLI semantics.
 use anyhow::Result;
 use llm_inference::*;
 use std::env;

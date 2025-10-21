@@ -1,12 +1,24 @@
+// M1: Model inference code (original CLI implementation).
+// This module loads a mistral model and provides two entrypoints:
+// - `run(args)` which preserves the original CLI behavior by printing tokens to stdout.
+// - `stream_from_args(args)` a new async API that returns a boxed token stream (Stream<Item = Result<String, Error>>).
+//
+// Recent modifications: added `stream_from_args` to allow server adapters (M1EngineAdapter)
+// to call the model and forward tokens as SSE without capturing stdout.
 use crate::parse;
 use anyhow::{Context, Result};
 use mistralrs::{
-    AutoDeviceMapParams, Device, DeviceMapSetting, IsqType, Model, PagedAttentionMetaBuilder,
+    Device, IsqType, PagedAttentionMetaBuilder,
     RequestBuilder, StopTokens, TextMessageRole, TextMessages, TextModelBuilder,
 };
 use mistralrs::{ChatCompletionChunkResponse, ChunkChoice, Delta, Response};
 use parse::Args;
 use tokio::io::{stdout, AsyncWriteExt};
+use async_stream::try_stream;
+use futures_util::StreamExt as _;
+use std::sync::Arc;
+use std::pin::Pin;
+use anyhow::Error;
 
 fn parse_device(s: &str) -> Device {
     match s.to_lowercase().as_str() {
@@ -17,8 +29,21 @@ fn parse_device(s: &str) -> Device {
 }
 
 pub async fn run(args: Args) -> Result<()> {
-    // format : hf id
-    // if exist, load from local cache else download and load
+    // reuse new stream_from_args to get a token stream, then print to stdout (preserve CLI behavior)
+    let mut stream = stream_from_args(args).await?;
+    let mut out = stdout();
+    while let Some(chunk) = stream.as_mut().next().await {
+        if let Ok(c) = chunk {
+            out.write_all(c.as_bytes()).await?;
+            out.flush().await?;
+        }
+    }
+    out.write_all(b"\n").await?;
+    Ok(())
+}
+
+/// 公共函数：给定 parse::Args，返回一个 boxed 的 token 流（Item = anyhow::Result<String>）
+pub async fn stream_from_args(args: Args) -> Result<Pin<Box<dyn futures_util::Stream<Item = Result<String, Error>> + Send + 'static>>> {
     let model_id = &args.model_name;
 
     let builder = TextModelBuilder::new(model_id)
@@ -32,7 +57,7 @@ pub async fn run(args: Args) -> Result<()> {
         .await
         .context("failed to build/load model")?;
 
-    println!("model loaded");
+    let model = Arc::new(model);
 
     let messages = TextMessages::new().add_message(TextMessageRole::User, &args.prompt);
 
@@ -65,24 +90,24 @@ pub async fn run(args: Args) -> Result<()> {
         req = req.set_sampler_stop_toks(StopTokens::Seqs(args.stop.clone()));
     }
 
-    // stdout
-    let mut stream = model.stream_chat_request(req).await?;
-    let mut out = stdout();
+    let model_clone = model.clone();
+    let req_clone = req;
 
-    while let Some(chunk) = stream.next().await {
-        if let Response::Chunk(ChatCompletionChunkResponse { choices, .. }) = chunk {
-            if let Some(ChunkChoice {
-                delta: Delta {
-                    content: Some(c), ..
-                },
-                ..
-            }) = choices.first()
-            {
-                out.write_all(c.as_bytes()).await?;
-                out.flush().await?;
+    let s = try_stream! {
+        let mut inner = model_clone.stream_chat_request(req_clone).await?;
+        while let Some(chunk) = inner.next().await {
+            match chunk {
+                Response::Chunk(ChatCompletionChunkResponse { choices, .. }) => {
+                    if let Some(ChunkChoice { delta: Delta { content: Some(c), .. }, .. }) = choices.first() {
+                        yield c.clone();
+                    } else {
+                        yield String::new();
+                    }
+                }
+                _ => continue,
             }
         }
-    }
-    out.write_all(b"\n").await?;
-    Ok(())
+    };
+
+    Ok(Box::pin(s))
 }
