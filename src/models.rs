@@ -1,6 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ChatMessage {
+    pub role: String,
+    pub content: String,
+}
+
 /// Inference 请求结构，字段来源于原始的 parse::Args
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -8,6 +14,10 @@ pub struct InferenceRequest {
     pub model_name: String,
     pub model_dir: Option<PathBuf>,
     pub prompt: String,
+    #[serde(default)]
+    pub messages: Option<Vec<ChatMessage>>,
+    #[serde(default)]
+    pub session_id: Option<String>,
     #[serde(default = "default_max_token")]
     pub max_token: usize,
     #[serde(default = "default_temperature")]

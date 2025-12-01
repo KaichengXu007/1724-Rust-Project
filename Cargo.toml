@@ -11,15 +11,23 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 thiserror = "2.0.17"
 tokio = { version = "1", features = ["full"] }
-axum = "0.6"
+axum = { version = "0.6", features = ["ws"] }
 async-trait = "0.1"
 futures-util = "0.3"
 tokio-stream = "0.1"
 tokio-util = "0.7"
-tower-http = { version = "0.6.6", features = ["trace"] }
+tower-http = { version = "0.4.4", features = ["trace", "fs"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 once_cell = "1.20"
 async-stream = "0.3"
 hyper = { version = "0.14", features = ["full"] }
 tower = "0.5.2"
+metrics = "0.21"
+metrics-exporter-prometheus = "0.12"
+chrono = { version = "0.4", features = ["serde"] }
+
+[features]
+cuda = ["mistralrs/cuda"]
+flash-attn = ["mistralrs/flash-attn"]
+metal = ["mistralrs/metal"]

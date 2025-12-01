@@ -18,7 +18,7 @@ pub trait InferenceEngine: Send + Sync {
     async fn run_streaming_inference(&self, request: InferenceRequest) -> AnyResult<TokenStream>;
 }
 
-use mistralrs::{Device, IsqType, PagedAttentionMetaBuilder, TextModelBuilder, Model};
+use mistralrs::{Device, PagedAttentionMetaBuilder, TextModelBuilder, Model};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
@@ -50,14 +50,27 @@ impl M1EngineAdapter {
 
         // not found -> build
         let dev = match device.to_lowercase().as_str() {
-            "cuda" => Device::cuda_if_available(0).unwrap_or(Device::Cpu),
+            "cuda" => {
+                #[cfg(not(feature = "cuda"))]
+                tracing::warn!("⚠️ 'cuda' device requested but 'cuda' feature is NOT enabled. This will likely cause CPU fallback. Run with '--features cuda'.");
+
+                match Device::cuda_if_available(0) {
+                    Ok(d) => {
+                        tracing::info!("✅ Successfully initialized CUDA device.");
+                        d
+                    }
+                    Err(e) => {
+                        tracing::warn!("⚠️ CUDA requested but not available: {:?}. Falling back to CPU.", e);
+                        Device::Cpu
+                    }
+                }
+            },
             "metal" => Device::new_metal(0).unwrap_or(Device::Cpu),
             _ => Device::Cpu,
         };
 
         let builder = TextModelBuilder::new(model_id)
             .with_device(dev)
-            .with_isq(IsqType::Q4_0)
             .with_logging()
             .with_paged_attn(|| PagedAttentionMetaBuilder::default().build())?;
 
@@ -83,7 +96,22 @@ impl InferenceEngine for M1EngineAdapter {
 
         let model = self.get_or_load_model(&model_id, &device).await?;
 
-        let messages = mistralrs::TextMessages::new().add_message(mistralrs::TextMessageRole::User, &request.prompt);
+        let mut messages = mistralrs::TextMessages::new();
+        
+        if let Some(msgs) = &request.messages {
+            for msg in msgs {
+                let role = match msg.role.to_lowercase().as_str() {
+                    "user" => mistralrs::TextMessageRole::User,
+                    "assistant" => mistralrs::TextMessageRole::Assistant,
+                    "system" => mistralrs::TextMessageRole::System,
+                    _ => mistralrs::TextMessageRole::User,
+                };
+                messages = messages.add_message(role, &msg.content);
+            }
+        } else {
+            messages = messages.add_message(mistralrs::TextMessageRole::User, &request.prompt);
+        }
+
         let mut req = mistralrs::RequestBuilder::from(messages)
             .set_sampler_max_len(request.max_token)
             .set_sampler_temperature(request.temperature);

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rust LLM Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .prose p { margin-bottom: 0.5em; }
+        .prose pre { background: #1e293b; padding: 1em; border-radius: 0.5em; overflow-x: auto; }
+        /* Custom scrollbar for dark mode */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 p-4 flex justify-between items-center shadow-md z-10">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            </div>
+            <h1 class="font-semibold text-lg tracking-tight">Rust LLM Inference</h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <select id="model-select" class="bg-gray-700 border border-gray-600 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2">
+                <option value="Qwen/Qwen2.5-0.5B-Instruct">Qwen 2.5 (0.5B)</option>
+                <option value="microsoft/Phi-3.5-mini-instruct">Phi-3.5 Mini</option>
+            </select>
+            <select id="device-select" class="bg-gray-700 border border-gray-600 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2">
+                <option value="cuda" selected>GPU (CUDA)</option>
+                <option value="cpu">CPU</option>
+            </select>
+            <button onclick="newChat()" class="text-gray-400 hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Chat Area -->
+    <main id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
+        <!-- Welcome Message -->
+        <div class="flex flex-col items-center justify-center h-full text-gray-500 space-y-4" id="welcome-screen">
+            <div class="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mb-4">
+                <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+            </div>
+            <h2 class="text-xl font-medium text-gray-300">How can I help you today?</h2>
+        </div>
+    </main>
+
+    <!-- Input Area -->
+    <footer class="bg-gray-800 p-4 border-t border-gray-700">
+        <div class="max-w-4xl mx-auto relative">
+            <textarea id="user-input" rows="1" class="w-full bg-gray-700 text-white rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none overflow-hidden shadow-inner" placeholder="Message Rust LLM..." oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'" onkeydown="handleEnter(event)"></textarea>
+            <button onclick="sendMessage()" id="send-btn" class="absolute right-2 bottom-2 p-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+            </button>
+        </div>
+        <div class="text-center text-xs text-gray-500 mt-2">
+            Powered by Rust, Axum & Mistral.rs
+        </div>
+    </footer>
+
+    <script>
+        // Session Management
+        const STORAGE_KEY = 'rust_llm_session_id';
+        let sessionId = localStorage.getItem(STORAGE_KEY);
+        if (!sessionId) {
+            sessionId = crypto.randomUUID();
+            localStorage.setItem(STORAGE_KEY, sessionId);
+        }
+
+        let currentWs = null;
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const welcomeScreen = document.getElementById('welcome-screen');
+
+        // Load History on Startup
+        async function loadHistory() {
+            try {
+                const res = await fetch(`/chat/history/${sessionId}`);
+                if (res.ok) {
+                    const history = await res.json();
+                    if (history && history.length > 0) {
+                        // Hide welcome screen if we have history
+                        welcomeScreen.style.display = 'none';
+                        
+                        // Filter out system messages and render
+                        history.forEach(msg => {
+                            if (msg.role !== 'system') {
+                                appendMessage(msg.role, msg.content);
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load history:", e);
+            }
+        }
+
+        // Call loadHistory immediately
+        loadHistory();
+
+        function newChat() {
+            sessionId = crypto.randomUUID();
+            localStorage.setItem(STORAGE_KEY, sessionId);
+            chatContainer.innerHTML = '';
+            chatContainer.appendChild(welcomeScreen);
+            welcomeScreen.style.display = 'flex';
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function appendMessage(role, content) {
+            if (welcomeScreen.style.display !== 'none') {
+                welcomeScreen.style.display = 'none';
+            }
+
+            const div = document.createElement('div');
+            div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `max-w-[80%] rounded-2xl px-4 py-3 ${
+                role === 'user' 
+                ? 'bg-indigo-600 text-white rounded-br-none' 
+                : 'bg-gray-700 text-gray-100 rounded-bl-none prose prose-invert'
+            }`;
+            
+            if (role === 'assistant') {
+                bubble.innerHTML = marked.parse(content);
+            } else {
+                bubble.textContent = content;
+            }
+
+            div.appendChild(bubble);
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return bubble;
+        }
+
+        function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // UI Updates
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            appendMessage('user', text);
+
+            // Prepare Assistant Bubble
+            const assistantBubble = appendMessage('assistant', '');
+            let fullResponse = '';
+
+            // WebSocket Connection
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/chat/ws`;
+            const ws = new WebSocket(wsUrl);
+            currentWs = ws;
+
+            ws.onopen = () => {
+                const payload = {
+                    "model-name": document.getElementById('model-select').value,
+                    "prompt": text,
+                    "session-id": sessionId,
+                    "max-token": 512,
+                    "temperature": 0.7,
+                    "device": document.getElementById('device-select').value
+                };
+                ws.send(JSON.stringify(payload));
+            };
+
+            ws.onmessage = (event) => {
+                const token = event.data;
+                if (token.startsWith('__ERROR__')) {
+                    fullResponse += `\n\n*[Error: ${token.substring(9)}]*`;
+                } else {
+                    fullResponse += token;
+                }
+                // Real-time markdown rendering can be expensive, maybe optimize later
+                assistantBubble.innerHTML = marked.parse(fullResponse);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            };
+
+            ws.onclose = () => {
+                currentWs = null;
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+                assistantBubble.innerHTML += '\n\n*[Connection Error]*';
+            };
+        }
+    </script>
+</body>
+</html>
