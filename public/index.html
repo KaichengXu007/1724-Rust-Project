@@ -18,54 +18,82 @@
         ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 h-screen flex flex-col overflow-hidden">
+<body class="bg-gray-900 text-gray-100 h-screen flex overflow-hidden">
 
-    <!-- Header -->
-    <header class="bg-gray-800 border-b border-gray-700 p-4 flex justify-between items-center shadow-md z-10">
-        <div class="flex items-center gap-3">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
+        <div class="p-4 border-b border-gray-800 flex items-center gap-2">
             <div class="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
             </div>
-            <h1 class="font-semibold text-lg tracking-tight">Rust LLM Inference</h1>
+            <h1 class="font-semibold text-lg tracking-tight">Rust LLM</h1>
         </div>
-        <div class="flex items-center gap-4">
-            <select id="model-select" class="bg-gray-700 border border-gray-600 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2">
-                <option value="Qwen/Qwen2.5-0.5B-Instruct">Qwen 2.5 (0.5B)</option>
-                <option value="microsoft/Phi-3.5-mini-instruct">Phi-3.5 Mini</option>
-            </select>
-            <select id="device-select" class="bg-gray-700 border border-gray-600 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2">
-                <option value="cuda" selected>GPU (CUDA)</option>
-                <option value="cpu">CPU</option>
-            </select>
-            <button onclick="newChat()" class="text-gray-400 hover:text-white transition-colors">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        
+        <div class="p-3">
+            <button onclick="newChat()" class="w-full flex items-center gap-2 px-4 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors text-sm font-medium border border-gray-700">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                New Chat
             </button>
         </div>
-    </header>
 
-    <!-- Chat Area -->
-    <main id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
-        <!-- Welcome Message -->
-        <div class="flex flex-col items-center justify-center h-full text-gray-500 space-y-4" id="welcome-screen">
-            <div class="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mb-4">
-                <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+        <div class="flex-1 overflow-y-auto px-3 py-2 space-y-1" id="session-list">
+            <!-- Session items will be injected here -->
+        </div>
+
+        <div class="p-4 border-t border-gray-800 text-xs text-gray-500">
+            <div class="flex justify-between items-center mb-2">
+                <span>Model:</span>
+                <select id="model-select" class="bg-gray-800 border border-gray-700 rounded px-1 py-0.5 text-xs focus:outline-none">
+                    <option value="Qwen/Qwen2.5-0.5B-Instruct">Qwen 2.5</option>
+                    <option value="microsoft/Phi-3.5-mini-instruct">Phi-3.5</option>
+                </select>
             </div>
-            <h2 class="text-xl font-medium text-gray-300">How can I help you today?</h2>
+            <div class="flex justify-between items-center">
+                <span>Device:</span>
+                <select id="device-select" class="bg-gray-800 border border-gray-700 rounded px-1 py-0.5 text-xs focus:outline-none">
+                    <option value="cuda" selected>GPU (CUDA)</option>
+                    <option value="cpu">CPU</option>
+                </select>
+            </div>
         </div>
-    </main>
+    </aside>
 
-    <!-- Input Area -->
-    <footer class="bg-gray-800 p-4 border-t border-gray-700">
-        <div class="max-w-4xl mx-auto relative">
-            <textarea id="user-input" rows="1" class="w-full bg-gray-700 text-white rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none overflow-hidden shadow-inner" placeholder="Message Rust LLM..." oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'" onkeydown="handleEnter(event)"></textarea>
-            <button onclick="sendMessage()" id="send-btn" class="absolute right-2 bottom-2 p-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
-            </button>
-        </div>
-        <div class="text-center text-xs text-gray-500 mt-2">
-            Powered by Rust, Axum & Mistral.rs
-        </div>
-    </footer>
+    <!-- Main Chat Area -->
+    <div class="flex-1 flex flex-col h-full relative">
+        <!-- Chat Messages -->
+        <main id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth pb-32">
+            <!-- Welcome Message -->
+            <div class="flex flex-col items-center justify-center h-full text-gray-500 space-y-4" id="welcome-screen">
+                <div class="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mb-4">
+                    <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                </div>
+                <h2 class="text-xl font-medium text-gray-300">How can I help you today?</h2>
+            </div>
+        </main>
+
+        <!-- Input Area -->
+        <footer class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900 via-gray-900 to-transparent pt-10 pb-6 px-4">
+            <div class="max-w-3xl mx-auto relative">
+                <!-- Stop Generation Button (Hidden by default) -->
+                <div id="stop-btn-container" class="absolute -top-12 left-1/2 transform -translate-x-1/2 hidden">
+                    <button onclick="stopGeneration()" class="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full text-sm font-medium shadow-lg transition-colors">
+                        <svg class="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
+                        Stop generating
+                    </button>
+                </div>
+
+                <div class="relative bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
+                    <textarea id="user-input" rows="1" class="w-full bg-transparent text-white rounded-xl pl-4 pr-12 py-3 focus:outline-none resize-none overflow-hidden" placeholder="Message Rust LLM..." oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'" onkeydown="handleEnter(event)"></textarea>
+                    <button onclick="sendMessage()" id="send-btn" class="absolute right-2 bottom-2 p-1.5 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                    </button>
+                </div>
+                <div class="text-center text-xs text-gray-500 mt-2">
+                    Powered by Rust, Axum & Mistral.rs
+                </div>
+            </div>
+        </footer>
+    </div>
 
     <script>
         // Session Management
@@ -80,23 +108,82 @@
         const chatContainer = document.getElementById('chat-container');
         const userInput = document.getElementById('user-input');
         const welcomeScreen = document.getElementById('welcome-screen');
+        const sessionList = document.getElementById('session-list');
+        const stopBtnContainer = document.getElementById('stop-btn-container');
 
-        // Load History on Startup
+        // --- Sidebar Logic ---
+        async function loadSessions() {
+            try {
+                const res = await fetch('/sessions');
+                if (res.ok) {
+                    const sessions = await res.json();
+                    renderSessionList(sessions);
+                }
+            } catch (e) {
+                console.error("Failed to load sessions:", e);
+            }
+        }
+
+        function renderSessionList(sessions) {
+            sessionList.innerHTML = '';
+            sessions.forEach(sid => {
+                const div = document.createElement('div');
+                const isActive = sid === sessionId;
+                div.className = `group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer text-sm ${isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'}`;
+                div.onclick = () => switchSession(sid);
+                
+                div.innerHTML = `
+                    <span class="truncate w-32">${sid.substring(0, 8)}...</span>
+                    <button onclick="deleteSession(event, '${sid}')" class="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                `;
+                sessionList.appendChild(div);
+            });
+        }
+
+        async function switchSession(sid) {
+            sessionId = sid;
+            localStorage.setItem(STORAGE_KEY, sessionId);
+            await loadHistory();
+            loadSessions(); // Refresh active state
+        }
+
+        async function deleteSession(e, sid) {
+            e.stopPropagation();
+            if (!confirm('Delete this chat?')) return;
+            
+            await fetch(`/chat/history/${sid}`, { method: 'DELETE' });
+            if (sid === sessionId) {
+                newChat();
+            } else {
+                loadSessions();
+            }
+        }
+
+        // --- Chat Logic ---
+
         async function loadHistory() {
+            chatContainer.innerHTML = '';
+            chatContainer.appendChild(welcomeScreen);
+            welcomeScreen.style.display = 'flex';
+
             try {
                 const res = await fetch(`/chat/history/${sessionId}`);
                 if (res.ok) {
                     const history = await res.json();
                     if (history && history.length > 0) {
-                        // Hide welcome screen if we have history
                         welcomeScreen.style.display = 'none';
-                        
-                        // Filter out system messages and render
                         history.forEach(msg => {
                             if (msg.role !== 'system') {
                                 appendMessage(msg.role, msg.content);
                             }
                         });
+                        // Add regenerate button to last assistant message if exists
+                        const lastMsg = history[history.length - 1];
+                        if (lastMsg && lastMsg.role === 'assistant') {
+                            addRegenerateButton();
+                        }
                     }
                 }
             } catch (e) {
@@ -104,15 +191,11 @@
             }
         }
 
-        // Call loadHistory immediately
-        loadHistory();
-
         function newChat() {
             sessionId = crypto.randomUUID();
             localStorage.setItem(STORAGE_KEY, sessionId);
-            chatContainer.innerHTML = '';
-            chatContainer.appendChild(welcomeScreen);
-            welcomeScreen.style.display = 'flex';
+            loadHistory();
+            loadSessions();
         }
 
         function handleEnter(e) {
@@ -128,39 +211,185 @@
             }
 
             const div = document.createElement('div');
-            div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            // Added 'items-end' to align button with bottom of bubble if multiline, or 'items-center'
+            div.className = `flex w-full mb-6 ${role === 'user' ? 'justify-end items-center gap-2 group' : 'justify-start'}`;
             
             const bubble = document.createElement('div');
-            bubble.className = `max-w-[80%] rounded-2xl px-4 py-3 ${
+            bubble.className = `relative max-w-[85%] rounded-2xl px-5 py-3.5 ${
                 role === 'user' 
-                ? 'bg-indigo-600 text-white rounded-br-none' 
-                : 'bg-gray-700 text-gray-100 rounded-bl-none prose prose-invert'
+                ? 'bg-gray-800 text-white' 
+                : 'text-gray-100 prose prose-invert'
             }`;
             
             if (role === 'assistant') {
                 bubble.innerHTML = marked.parse(content);
+                div.appendChild(bubble);
             } else {
                 bubble.textContent = content;
+                // Add Edit Button for User
+                // Changed to be a flex item instead of absolute
+                const editBtn = document.createElement('button');
+                editBtn.className = 'p-1 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity';
+                editBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>';
+                editBtn.onclick = () => enableEditMode(div, content);
+                
+                // Append button FIRST so it appears to the left (since justify-end)
+                div.appendChild(editBtn);
+                div.appendChild(bubble);
             }
 
-            div.appendChild(bubble);
             chatContainer.appendChild(div);
             chatContainer.scrollTop = chatContainer.scrollHeight;
             return bubble;
         }
 
-        function sendMessage() {
-            const text = userInput.value.trim();
+        function enableEditMode(messageDiv, oldContent) {
+            const bubble = messageDiv.querySelector('div');
+            const originalHtml = bubble.innerHTML;
+            
+            bubble.innerHTML = `
+                <textarea class="w-full bg-gray-900 text-white rounded p-2 border border-gray-700 focus:outline-none resize-none" rows="3">${oldContent}</textarea>
+                <div class="flex justify-end gap-2 mt-2">
+                    <button class="px-3 py-1 text-xs bg-gray-700 rounded hover:bg-gray-600 cancel-edit">Cancel</button>
+                    <button class="px-3 py-1 text-xs bg-indigo-600 rounded hover:bg-indigo-500 save-edit">Save & Submit</button>
+                </div>
+            `;
+            
+            const textarea = bubble.querySelector('textarea');
+            textarea.focus();
+            
+            bubble.querySelector('.cancel-edit').onclick = () => {
+                bubble.innerHTML = originalHtml; // Restore
+                bubble.textContent = oldContent; // Re-set text content to be safe
+            };
+            
+            bubble.querySelector('.save-edit').onclick = async () => {
+                const newText = textarea.value.trim();
+                if (!newText || newText === oldContent) {
+                    bubble.innerHTML = originalHtml;
+                    bubble.textContent = oldContent;
+                    return;
+                }
+                
+                // Rollback logic: We assume this is the LAST user message for MVP simplicity
+                // Ideally we'd calculate index, but for now let's just rollback 2 (Assistant + User) and resend
+                await fetch(`/chat/history/${sessionId}/rollback`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ amount: 2 })
+                });
+                
+                // Clear UI from this message onwards (simple reload for now to be safe, or manual DOM manipulation)
+                // Manual: Remove this div and everything after it
+                let next = messageDiv.nextElementSibling;
+                while(next) {
+                    const toRemove = next;
+                    next = next.nextElementSibling;
+                    toRemove.remove();
+                }
+                messageDiv.remove();
+                
+                // Send new message
+                sendMessage(newText);
+            };
+        }
+
+        function addRegenerateButton() {
+            // Remove existing regenerate buttons
+            document.querySelectorAll('.regenerate-btn').forEach(b => b.remove());
+
+            const lastMsg = chatContainer.lastElementChild;
+            if (!lastMsg) return;
+
+            const btnDiv = document.createElement('div');
+            btnDiv.className = 'flex justify-start mt-1 regenerate-btn';
+            btnDiv.innerHTML = `
+                <button onclick="regenerateLast()" class="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Regenerate
+                </button>
+            `;
+            chatContainer.appendChild(btnDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function regenerateLast() {
+            // 1. Get last user message content
+            // The structure is: Div(User) -> Div(Assistant) -> Div(RegenerateBtn)
+            // We need to find the last User message.
+            // Filter to get only message divs (exclude regenerate button which has specific class or just check structure)
+            // Actually, the regenerate button is a div with class 'regenerate-btn'
+            
+            const allDivs = Array.from(chatContainer.children);
+            // Find the last div that contains a user message bubble
+            // User message divs have 'justify-end' class
+            let lastUserMsgDiv = null;
+            for (let i = allDivs.length - 1; i >= 0; i--) {
+                if (allDivs[i].classList.contains('justify-end')) {
+                    lastUserMsgDiv = allDivs[i];
+                    break;
+                }
+            }
+
+            if (!lastUserMsgDiv) return;
+            
+            // The text is in the bubble (second child if we have the button, or just find the bubble div)
+            // In our new structure (see appendMessage fix below), the bubble is the div with max-w-[85%]
+            const bubble = lastUserMsgDiv.querySelector('.max-w-\\[85\\%\\]');
+            if (!bubble) return;
+            
+            const lastUserText = bubble.textContent;
+
+            // 2. Rollback backend (Remove Assistant + User)
+            await fetch(`/chat/history/${sessionId}/rollback`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ amount: 2 })
+            });
+
+            // 3. Clear UI: Remove everything after the found user message (inclusive)
+            // This covers the User message, the Assistant message, and the Regenerate button
+            let next = lastUserMsgDiv;
+            while(next) {
+                const toRemove = next;
+                next = next.nextElementSibling;
+                toRemove.remove();
+            }
+
+            // 4. Resend
+            sendMessage(lastUserText);
+        }
+
+        function stopGeneration() {
+            if (currentWs) {
+                currentWs.close();
+                currentWs = null;
+                stopBtnContainer.classList.add('hidden');
+                addRegenerateButton();
+            }
+        }
+
+        function sendMessage(manualText = null) {
+            const text = manualText || userInput.value.trim();
             if (!text) return;
 
             // UI Updates
-            userInput.value = '';
-            userInput.style.height = 'auto';
+            if (!manualText) {
+                userInput.value = '';
+                userInput.style.height = 'auto';
+            }
+            
+            // Remove regenerate button if exists
+            document.querySelectorAll('.regenerate-btn').forEach(b => b.remove());
+
             appendMessage('user', text);
 
             // Prepare Assistant Bubble
             const assistantBubble = appendMessage('assistant', '');
             let fullResponse = '';
+
+            // Show Stop Button
+            stopBtnContainer.classList.remove('hidden');
 
             // WebSocket Connection
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -178,6 +407,8 @@
                     "device": document.getElementById('device-select').value
                 };
                 ws.send(JSON.stringify(payload));
+                // Refresh session list to show new session if it was empty
+                loadSessions();
             };
 
             ws.onmessage = (event) => {
@@ -187,20 +418,26 @@
                 } else {
                     fullResponse += token;
                 }
-                // Real-time markdown rendering can be expensive, maybe optimize later
                 assistantBubble.innerHTML = marked.parse(fullResponse);
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             };
 
             ws.onclose = () => {
                 currentWs = null;
+                stopBtnContainer.classList.add('hidden');
+                addRegenerateButton();
             };
 
             ws.onerror = (err) => {
                 console.error('WebSocket error:', err);
                 assistantBubble.innerHTML += '\n\n*[Connection Error]*';
+                stopBtnContainer.classList.add('hidden');
             };
         }
+
+        // Init
+        loadSessions();
+        loadHistory();
     </script>
 </body>
 </html>

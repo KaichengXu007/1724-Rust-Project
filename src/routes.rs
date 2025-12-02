@@ -13,9 +13,11 @@ const MAX_HISTORY_LENGTH: usize = 20; // Keep last 20 messages (approx 10 rounds
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/models", get(get_models))
+        .route("/sessions", get(list_sessions))
         .route("/chat/completions", post(chat_completions))
         .route("/chat/ws", get(chat_ws))
-        .route("/chat/history/:session_id", get(get_history))
+        .route("/chat/history/:session_id", get(get_history).delete(delete_session))
+        .route("/chat/history/:session_id/rollback", post(rollback_history))
         .route("/health", get(health_check))
         .route("/metrics", get(metrics_handler))
 }
@@ -60,6 +62,53 @@ async fn get_models(State(state): State<AppState>) -> impl IntoResponse {
     let list = state.engine.get_available_models().await;
     let resp = ModelsList { models: list };
     Json(resp)
+}
+
+async fn list_sessions(State(state): State<AppState>) -> impl IntoResponse {
+    let sessions = state.sessions.lock().await;
+    let keys: Vec<String> = sessions.keys().cloned().collect();
+    Json(keys)
+}
+
+async fn delete_session(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>
+) -> impl IntoResponse {
+    {
+        let mut sessions = state.sessions.lock().await;
+        sessions.remove(&session_id);
+    }
+    state.save_sessions().await;
+    axum::http::StatusCode::NO_CONTENT
+}
+
+async fn rollback_history(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+    Json(payload): Json<serde_json::Value>
+) -> impl IntoResponse {
+    let amount = payload.get("amount").and_then(|v| v.as_u64()).unwrap_or(1) as usize;
+    
+    {
+        let mut sessions = state.sessions.lock().await;
+        
+        if let Some(history) = sessions.get_mut(&session_id) {
+            let len = history.len();
+            if len > amount {
+                history.truncate(len - amount);
+            } else {
+                // Don't remove system prompt if possible, or just clear all except system
+                 let has_system = history.first().map(|m| m.role == "system").unwrap_or(false);
+                 if has_system {
+                     history.truncate(1);
+                 } else {
+                     history.clear();
+                 }
+            }
+        }
+    }
+    state.save_sessions().await;
+    Json(serde_json::json!({"status": "ok"}))
 }
 
 async fn get_history(

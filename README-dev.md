@@ -14,9 +14,14 @@
     *   基于 `Axum` 的高性能 Web 服务器。
     *   **WebSocket** 实时流式对话接口。
     *   **REST API** (`/chat/completions`) 支持。
-    *   内置现代化 Web 前端（Dark Mode, Markdown 渲染, 模型/设备切换）。
+    *   内置现代化 Web 前端：
+        *   支持 Dark Mode 与 Markdown 渲染。
+        *   **停止生成 (Stop Generation)**: 支持中途打断推理。
+        *   **重新生成 (Regenerate)**: 支持重新生成满意的回复。
+        *   **编辑输入 (Edit Input)**: 支持修改历史提问并重新分支对话。
 
 3.  **会话管理 (Session Management)**:
+    *   **多会话支持**: 侧边栏管理多个独立会话，支持新建、切换与删除。
     *   **持久化存储**: 对话历史保存于 `sessions.json`，重启服务不丢失。
     *   **上下文自动修剪**: 自动保留最近 20 条消息，防止上下文溢出。
     *   **历史记录回溯**: 前端自动加载之前的对话记录。
@@ -65,4 +70,4 @@
     *   提供 Dockerfile 和 docker-compose 配置，简化部署流程。
 
 ---
-*Last Updated: 2025-12-01*
+*Last Updated: 2025-12-02*
