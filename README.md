@@ -3,7 +3,6 @@
 A high-performance, production-ready Large Language Model (LLM) inference service built entirely in Rust. Provides OpenAI-compatible APIs with token streaming, session management, and a modern web UI.
 
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](#-license)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docker/)
 
 ## ✨ Features
@@ -85,8 +84,8 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
 
 1. **Clone the repository**:
 ```bash
-git clone https://github.com/yourusername/rust-llm-inference.git
-cd rust-llm-inference
+git clone https://github.com/KaichengXu007/1724-Rust-Project.git
+cd 1724-Rust-Project
 ```
 
 2. **Create configuration** (optional):
@@ -198,42 +197,6 @@ response = requests.post(
 )
 print(response.json()["text"])
 ```
-
----
-
-## 🐳 Docker Deployment
-
-### CPU Version
-
-```bash
-docker build -t rust-llm:cpu -f docker/Dockerfile .
-docker run -p 3000:3000 -v ./config.toml:/app/config.toml rust-llm:cpu
-```
-
-### GPU Version (CUDA)
-
-```bash
-docker build -f docker/Dockerfile.cuda -t rust-llm:cuda .
-docker run --gpus all -p 3000:3000 rust-llm:cuda
-```
-
-### Docker Compose
-
-```bash
-# CPU service
-docker-compose -f docker/docker-compose.yml up llm-cpu
-
-# GPU service
-docker-compose -f docker/docker-compose.yml up llm-gpu
-
-# With Prometheus + Grafana
-docker-compose -f docker/docker-compose.yml up
-```
-
-Access services:
-- **LLM Service**: http://localhost:3000
-- **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3002 (admin/admin)
 
 ---
 
@@ -394,22 +357,6 @@ cargo build --release --features flash-attn
 
 ---
 
-## 🤝 Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Submit a pull request
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
 ## 🙏 Acknowledgments
 
 - **[mistral.rs](https://github.com/EricLBuehler/mistral.rs)**: High-performance Rust inference
@@ -418,9 +365,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Rust Community**: For amazing tooling and libraries
 
 ---
-
-## 📧 Contact
-
-For questions or issues, please open a GitHub issue or contact the maintainers.
-
-**Happy inferencing! 🦀✨**
