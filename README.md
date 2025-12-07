@@ -183,21 +183,6 @@ curl -X POST http://localhost:3000/chat/completions \
   }'
 ```
 
-**Python client**:
-```python
-import requests
-
-response = requests.post(
-    "http://localhost:3000/completions",
-    json={
-        "model": "Qwen/Qwen2.5-0.5B-Instruct",
-        "prompt": "Hello, Rust!",
-        "max_tokens": 50
-    }
-)
-print(response.json()["text"])
-```
-
 ---
 
 ## 🧪 Testing
@@ -207,16 +192,6 @@ Run the test suite:
 ```bash
 # All tests
 cargo test
-
-# Integration tests only
-cargo test --test integration_tests
-
-# With output
-cargo test -- --nocapture
-
-# Specific test
-cargo test test_completions_endpoint
-```
 
 ---
 
@@ -241,30 +216,7 @@ curl http://localhost:3000/health
 # Readiness (checks model availability)
 curl http://localhost:3000/readiness
 ```
-
 ---
-
-## 🔐 Security
-
-### Enable Authentication
-
-1. Edit `config.toml`:
-```toml
-[security]
-enable_auth = true
-
-[[security.api_keys]]
-key = "sk-your-secret-key-here"
-name = "production"
-rate_limit_per_minute = 100
-enabled = true
-```
-
-2. Include API key in requests:
-```bash
-curl -H "Authorization: Bearer sk-your-secret-key-here" \
-  http://localhost:3000/completions
-```
 
 ### Rate Limiting
 
