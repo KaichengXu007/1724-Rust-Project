@@ -6,16 +6,74 @@
     <title>Rust LLM Chat</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .prose p { margin-bottom: 0.5em; }
-        .prose pre { background: #1e293b; padding: 1em; border-radius: 0.5em; overflow-x: auto; }
+        .prose pre { background: #1e293b; padding: 1em; border-radius: 0.5em; overflow-x: auto; margin: 0.5em 0; }
+        .prose code { background: #374151; padding: 0.2em 0.4em; border-radius: 0.25em; font-size: 0.9em; }
+        .prose pre code { background: transparent; padding: 0; }
+        .prose ul, .prose ol { margin-left: 1.5em; }
+        .prose li { margin-bottom: 0.25em; }
+        
         /* Custom scrollbar for dark mode */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1f2937; }
         ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        /* Typing animation */
+        .typing-indicator {
+            display: inline-flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #6366f1;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+        
+        /* Fade in animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        /* Copy button for code blocks */
+        .code-block-wrapper {
+            position: relative;
+        }
+        .copy-code-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .code-block-wrapper:hover .copy-code-btn {
+            opacity: 1;
+        }
+        
+        /* Token counter animation */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .pulse { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 h-screen flex overflow-hidden">
@@ -40,20 +98,95 @@
             <!-- Session items will be injected here -->
         </div>
 
-        <div class="p-4 border-t border-gray-800 text-xs text-gray-500">
-            <div class="flex justify-between items-center mb-2">
-                <span>Model:</span>
-                <select id="model-select" class="bg-gray-800 border border-gray-700 rounded px-1 py-0.5 text-xs focus:outline-none">
-                    <option value="Qwen/Qwen2.5-0.5B-Instruct">Qwen 2.5</option>
-                    <option value="microsoft/Phi-3.5-mini-instruct">Phi-3.5</option>
+        <div class="p-4 border-t border-gray-800 text-xs text-gray-500 space-y-3">
+            <!-- Model Selection -->
+            <div class="space-y-1">
+                <label class="block text-gray-400 font-medium">Model</label>
+                <select id="model-select" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                    <option value="Qwen/Qwen2.5-0.5B-Instruct">🤖 Qwen 2.5 (0.5B)</option>
+                    <option value="microsoft/Phi-3.5-mini-instruct">🧠 Phi-3.5 Mini</option>
                 </select>
             </div>
-            <div class="flex justify-between items-center">
-                <span>Device:</span>
-                <select id="device-select" class="bg-gray-800 border border-gray-700 rounded px-1 py-0.5 text-xs focus:outline-none">
-                    <option value="cuda" selected>GPU (CUDA)</option>
-                    <option value="cpu">CPU</option>
+            
+            <!-- Device Selection -->
+            <div class="space-y-1">
+                <label class="block text-gray-400 font-medium">Device</label>
+                <select id="device-select" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                    <option value="cuda">⚡ GPU (CUDA)</option>
+                    <option value="cpu" selected>💻 CPU</option>
                 </select>
+            </div>
+            
+            <!-- Advanced Settings Toggle -->
+            <details class="group">
+                <summary class="cursor-pointer text-gray-400 hover:text-gray-300 font-medium list-none flex items-center justify-between">
+                    <span>⚙️ Advanced</span>
+                    <svg class="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </summary>
+                <div class="mt-2 space-y-3 pt-2 border-t border-gray-700 max-h-96 overflow-y-auto">
+                    <!-- Temperature -->
+                    <div>
+                        <label class="block text-gray-400 mb-1 text-[11px]">Temperature: <span id="temp-value" class="text-white font-medium">0.7</span></label>
+                        <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider" oninput="document.getElementById('temp-value').textContent = this.value">
+                        <p class="text-[10px] text-gray-500 mt-1">Controls randomness (0=deterministic, 2=very random)</p>
+                    </div>
+                    
+                    <!-- Top P -->
+                    <div>
+                        <label class="block text-gray-400 mb-1 text-[11px]">Top P: <span id="top-p-value" class="text-white font-medium">0.95</span></label>
+                        <input type="range" id="top-p" min="0" max="1" step="0.05" value="0.95" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider" oninput="document.getElementById('top-p-value').textContent = this.value">
+                        <p class="text-[10px] text-gray-500 mt-1">Nucleus sampling threshold</p>
+                    </div>
+                    
+                    <!-- Top K -->
+                    <div>
+                        <label class="block text-gray-400 mb-1 text-[11px]">Top K: <span id="top-k-value" class="text-white font-medium">40</span></label>
+                        <input type="range" id="top-k" min="1" max="100" step="1" value="40" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider" oninput="document.getElementById('top-k-value').textContent = this.value">
+                        <p class="text-[10px] text-gray-500 mt-1">Limits vocabulary to top K tokens</p>
+                    </div>
+                    
+                    <!-- Max Tokens -->
+                    <div>
+                        <label class="block text-gray-400 mb-1 text-[11px]">Max Tokens: <span id="tokens-value" class="text-white font-medium">512</span></label>
+                        <input type="range" id="max-tokens" min="128" max="2048" step="128" value="512" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider" oninput="document.getElementById('tokens-value').textContent = this.value">
+                        <p class="text-[10px] text-gray-500 mt-1">Maximum response length</p>
+                    </div>
+                    
+                    <!-- Repeat Penalty -->
+                    <div>
+                        <label class="block text-gray-400 mb-1 text-[11px]">Repeat Penalty: <span id="repeat-penalty-value" class="text-white font-medium">1.1</span></label>
+                        <input type="range" id="repeat-penalty" min="1" max="2" step="0.1" value="1.1" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider" oninput="document.getElementById('repeat-penalty-value').textContent = this.value">
+                        <p class="text-[10px] text-gray-500 mt-1">Penalizes token repetition (1=off)</p>
+                    </div>
+                    
+                    <!-- System Prompt -->
+                    <div>
+                        <label class="block text-gray-400 mb-1 text-[11px]">System Prompt</label>
+                        <textarea id="system-prompt" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none" placeholder="You are a helpful assistant..."></textarea>
+                        <p class="text-[10px] text-gray-500 mt-1">Sets the AI's behavior and role</p>
+                    </div>
+                    
+                    <!-- Stop Sequences -->
+                    <div>
+                        <label class="block text-gray-400 mb-1 text-[11px]">Stop Sequences</label>
+                        <input type="text" id="stop-sequences" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="e.g., \n\n, END, ###">
+                        <p class="text-[10px] text-gray-500 mt-1">Comma-separated stop tokens</p>
+                    </div>
+                    
+                    <!-- Reset Button -->
+                    <button onclick="resetAdvancedSettings()" class="w-full px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-[11px] text-gray-300 transition-colors">
+                        Reset to Defaults
+                    </button>
+                </div>
+            </details>
+            
+            <!-- Stats -->
+            <div class="pt-2 border-t border-gray-700 flex items-center justify-between text-[10px]">
+                <span class="flex items-center gap-1">
+                    <span class="w-2 h-2 bg-green-500 rounded-full" id="status-indicator"></span>
+                    <span id="status-text">Connected</span>
+                </span>
+                <span id="token-counter" class="hidden">0 tokens</span>
             </div>
         </div>
     </aside>
@@ -110,6 +243,20 @@
         const welcomeScreen = document.getElementById('welcome-screen');
         const sessionList = document.getElementById('session-list');
         const stopBtnContainer = document.getElementById('stop-btn-container');
+        let tokenCount = 0;
+        let startTime = 0;
+
+        // Configure marked for better code rendering
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true,
+            gfm: true
+        });
 
         // --- Sidebar Logic ---
         async function loadSessions() {
@@ -211,29 +358,31 @@
             }
 
             const div = document.createElement('div');
-            // Added 'items-end' to align button with bottom of bubble if multiline, or 'items-center'
-            div.className = `flex w-full mb-6 ${role === 'user' ? 'justify-end items-center gap-2 group' : 'justify-start'}`;
+            div.className = `flex w-full mb-6 message-fade-in ${role === 'user' ? 'justify-end items-center gap-2 group' : 'justify-start'}`;
             
             const bubble = document.createElement('div');
             bubble.className = `relative max-w-[85%] rounded-2xl px-5 py-3.5 ${
                 role === 'user' 
-                ? 'bg-gray-800 text-white' 
+                ? 'bg-gray-800 text-white shadow-lg' 
                 : 'text-gray-100 prose prose-invert'
             }`;
             
             if (role === 'assistant') {
-                bubble.innerHTML = marked.parse(content);
+                if (content) {
+                    bubble.innerHTML = marked.parse(content);
+                    wrapCodeBlocks(bubble);
+                } else {
+                    // Show typing indicator for empty assistant message
+                    bubble.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+                }
                 div.appendChild(bubble);
             } else {
                 bubble.textContent = content;
-                // Add Edit Button for User
-                // Changed to be a flex item instead of absolute
                 const editBtn = document.createElement('button');
                 editBtn.className = 'p-1 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity';
                 editBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>';
                 editBtn.onclick = () => enableEditMode(div, content);
                 
-                // Append button FIRST so it appears to the left (since justify-end)
                 div.appendChild(editBtn);
                 div.appendChild(bubble);
             }
@@ -241,6 +390,35 @@
             chatContainer.appendChild(div);
             chatContainer.scrollTop = chatContainer.scrollHeight;
             return bubble;
+        }
+
+        // Wrap code blocks with copy button
+        function wrapCodeBlocks(bubble) {
+            const preElements = bubble.querySelectorAll('pre');
+            preElements.forEach(pre => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'code-block-wrapper';
+                pre.parentNode.insertBefore(wrapper, pre);
+                wrapper.appendChild(pre);
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-code-btn px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-all';
+                copyBtn.textContent = 'Copy';
+                copyBtn.onclick = () => copyCode(copyBtn, pre);
+                wrapper.appendChild(copyBtn);
+            });
+        }
+
+        function copyCode(btn, pre) {
+            const code = pre.textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                btn.textContent = '✓ Copied!';
+                btn.classList.add('bg-green-600');
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('bg-green-600');
+                }, 2000);
+            });
         }
 
         function enableEditMode(messageDiv, oldContent) {
@@ -388,8 +566,11 @@
             const assistantBubble = appendMessage('assistant', '');
             let fullResponse = '';
 
-            // Show Stop Button
+            // Show Stop Button & Reset Counters
             stopBtnContainer.classList.remove('hidden');
+            tokenCount = 0;
+            startTime = Date.now();
+            updateTokenCounter();
 
             // WebSocket Connection
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -397,17 +578,41 @@
             const ws = new WebSocket(wsUrl);
             currentWs = ws;
 
+            // Update status
+            updateStatus('connecting', '⏳ Connecting...');
+
             ws.onopen = () => {
+                updateStatus('connected', '✓ Generating...');
+                
+                // Parse stop sequences
+                const stopInput = document.getElementById('stop-sequences').value.trim();
+                const stopSequences = stopInput ? stopInput.split(',').map(s => s.trim()).filter(s => s) : [];
+                
+                // Get system prompt if provided
+                const systemPrompt = document.getElementById('system-prompt').value.trim();
+                
                 const payload = {
                     "model-name": document.getElementById('model-select').value,
                     "prompt": text,
                     "session-id": sessionId,
-                    "max-token": 512,
-                    "temperature": 0.7,
-                    "device": document.getElementById('device-select').value
+                    "max-token": parseInt(document.getElementById('max-tokens').value),
+                    "temperature": parseFloat(document.getElementById('temperature').value),
+                    "top-p": parseFloat(document.getElementById('top-p').value),
+                    "top-k": parseInt(document.getElementById('top-k').value),
+                    "repeat-penalty": parseFloat(document.getElementById('repeat-penalty').value),
+                    "device": document.getElementById('device-select').value,
+                    "stop": stopSequences
                 };
+                
+                // Add system prompt to messages if provided
+                if (systemPrompt) {
+                    payload.messages = [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: text }
+                    ];
+                }
+                
                 ws.send(JSON.stringify(payload));
-                // Refresh session list to show new session if it was empty
                 loadSessions();
             };
 
@@ -415,16 +620,24 @@
                 const token = event.data;
                 if (token.startsWith('__ERROR__')) {
                     fullResponse += `\n\n*[Error: ${token.substring(9)}]*`;
+                    updateStatus('error', '❌ Error');
                 } else {
                     fullResponse += token;
+                    tokenCount++;
                 }
                 assistantBubble.innerHTML = marked.parse(fullResponse);
+                wrapCodeBlocks(assistantBubble);
+                updateTokenCounter();
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             };
 
             ws.onclose = () => {
                 currentWs = null;
                 stopBtnContainer.classList.add('hidden');
+                updateStatus('connected', '✓ Connected');
+                setTimeout(() => {
+                    document.getElementById('token-counter').classList.add('hidden');
+                }, 3000);
                 addRegenerateButton();
             };
 
@@ -432,7 +645,59 @@
                 console.error('WebSocket error:', err);
                 assistantBubble.innerHTML += '\n\n*[Connection Error]*';
                 stopBtnContainer.classList.add('hidden');
+                updateStatus('error', '❌ Disconnected');
             };
+        }
+
+        function updateTokenCounter() {
+            const counter = document.getElementById('token-counter');
+            if (tokenCount > 0) {
+                counter.classList.remove('hidden');
+                const elapsed = (Date.now() - startTime) / 1000;
+                const tokensPerSec = elapsed > 0 ? (tokenCount / elapsed).toFixed(1) : '0';
+                counter.textContent = `${tokenCount} tokens (${tokensPerSec} t/s)`;
+                counter.classList.add('pulse');
+            }
+        }
+
+        function updateStatus(state, text) {
+            const indicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            statusText.textContent = text;
+            
+            indicator.className = 'w-2 h-2 rounded-full';
+            if (state === 'connected') {
+                indicator.classList.add('bg-green-500');
+            } else if (state === 'connecting') {
+                indicator.classList.add('bg-yellow-500', 'animate-pulse');
+            } else if (state === 'error') {
+                indicator.classList.add('bg-red-500');
+            }
+        }
+
+        function resetAdvancedSettings() {
+            // Reset all sliders to defaults
+            document.getElementById('temperature').value = 0.7;
+            document.getElementById('temp-value').textContent = '0.7';
+            
+            document.getElementById('top-p').value = 0.95;
+            document.getElementById('top-p-value').textContent = '0.95';
+            
+            document.getElementById('top-k').value = 40;
+            document.getElementById('top-k-value').textContent = '40';
+            
+            document.getElementById('max-tokens').value = 512;
+            document.getElementById('tokens-value').textContent = '512';
+            
+            document.getElementById('repeat-penalty').value = 1.1;
+            document.getElementById('repeat-penalty-value').textContent = '1.1';
+            
+            document.getElementById('system-prompt').value = '';
+            document.getElementById('stop-sequences').value = '';
+            
+            // Visual feedback
+            const event = new Event('input', { bubbles: true });
+            document.getElementById('temperature').dispatchEvent(event);
         }
 
         // Init

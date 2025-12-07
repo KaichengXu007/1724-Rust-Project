@@ -1,0 +1,47 @@
+# Dockerfile optimized for CUDA/GPU support
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04 as builder
+
+# Install Rust and build dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /app
+
+# Copy manifests and build dependencies first (for caching)
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY public ./public
+
+# Build with CUDA support
+RUN cargo build --release --features cuda
+
+# Runtime stage with CUDA support
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy binary and assets
+COPY --from=builder /app/target/release/server /app/server
+COPY --from=builder /app/public /app/public
+COPY config.example.toml /app/config.example.toml
+
+VOLUME ["/app/models", "/app/data"]
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+CMD ["./server"]

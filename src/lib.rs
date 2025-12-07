@@ -4,11 +4,15 @@
 // Recent changes (commit):
 // - Added unit tests and integration tests with a MockEngine to verify routing and SSE
 // - Added helper test utilities under tests/ for consistent request construction
+// - Added configuration system with TOML support
+// - Added API key authentication and rate limiting middleware
 pub mod engine;
 pub mod state;
 pub mod models;
 pub mod routes;
 pub mod engine_mock;
+pub mod config;
+pub mod middleware;
 
 #[cfg(test)]
 mod tests {
@@ -26,7 +30,8 @@ let builder = PrometheusBuilder::new();
 let recorder = builder.build_recorder();
 let handle = recorder.handle();
 
-let state = state::AppState::new(std::sync::Arc::new(engine_mock::MockEngine::new()), handle);
+let config = config::Config::default();
+let state = state::AppState::new(std::sync::Arc::new(engine_mock::MockEngine::new()), handle, config);
 let app = routes::router().with_state(state);
 let req = Request::builder().method("GET").uri("/models").body(Body::empty()).unwrap();
 let resp = app.oneshot(req).await.expect("request");
@@ -40,16 +45,13 @@ async fn test_persistence_flow() {
 
     use metrics_exporter_prometheus::PrometheusBuilder;
     
-    // In tests, we don't want to install the global recorder because it can only be done once.
-    // Instead, we just build a recorder and handle to satisfy the AppState requirement.
-    // We don't care if metrics are actually collected in this test.
     let builder = PrometheusBuilder::new();
     let recorder = builder.build_recorder();
     let handle = recorder.handle();
 
     let engine = std::sync::Arc::new(engine_mock::MockEngine::new());
-    // We need to clone the handle because AppState takes ownership, and we need it for state2 as well
-    let state = state::AppState::new(engine.clone(), handle.clone());
+    let config = config::Config::default();
+    let state = state::AppState::new(engine.clone(), handle.clone(), config.clone());
     
     // Manually insert a session to simulate a chat
     {
@@ -66,7 +68,7 @@ async fn test_persistence_flow() {
     assert!(std::path::Path::new("sessions.json").exists());
     
     // Create new state and verify load
-    let state2 = state::AppState::new(engine, handle);
+    let state2 = state::AppState::new(engine, handle, config);
     let sessions = state2.sessions.lock().await;
     assert!(sessions.contains_key("test-session"));
     assert_eq!(sessions.get("test-session").unwrap()[0].content, "hello");
