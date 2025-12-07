@@ -119,8 +119,8 @@ The Rust LLM Inference Service is a high-performance, production-ready server fo
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/rust-llm-inference.git
-cd rust-llm-inference
+git clone https://github.com/KaichengXu007/1724-Rust-Project.git
+cd 1724-Rust-Project
 
 # Run with GPU (recommended)
 cargo run --release --features cuda --bin server
@@ -136,14 +136,14 @@ cargo run --release --bin server
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/rust-llm-inference.git
-cd rust-llm-inference
+git clone https://github.com/KaichengXu007/1724-Rust-Project.git
+cd 1724-Rust-Project
 
 # Run with GPU
-docker-compose up llm-gpu
+docker-compose -f docker/docker-compose.yml up llm-gpu
 
 # OR run with CPU
-docker-compose up llm-cpu
+docker-compose -f docker/docker-compose.yml up llm-cpu
 
 # Open browser
 # Navigate to http://localhost:3000
@@ -351,10 +351,10 @@ cargo run --release --features cuda --bin server
 **Build Images**:
 ```bash
 # CPU version
-docker build -t llm-service:cpu -f Dockerfile .
+docker build -t llm-service:cpu -f docker/Dockerfile .
 
 # GPU version
-docker build -t llm-service:gpu -f Dockerfile.cuda .
+docker build -t llm-service:gpu -f docker/Dockerfile.cuda .
 ```
 
 **Run Containers**:
@@ -376,13 +376,13 @@ docker run --gpus all -p 3000:3000 \
 
 ```bash
 # Start full stack (app + Prometheus + Grafana)
-docker-compose up -d
+docker-compose -f docker/docker-compose.yml up -d
 
 # View logs
-docker-compose logs -f llm-gpu
+docker-compose -f docker/docker-compose.yml logs -f llm-gpu
 
 # Stop stack
-docker-compose down
+docker-compose -f docker/docker-compose.yml down
 ```
 
 **Services**:
@@ -436,16 +436,20 @@ rust-llm-inference/
 ├── docs/
 │   ├── API_REFERENCE.md       # API documentation
 │   └── PROJECT_DOCUMENTATION.md # This file
+├── docker/
+│   ├── Dockerfile             # CPU image
+│   ├── Dockerfile.cuda        # GPU image
+│   ├── docker-compose.yml     # Docker stack
+│   ├── prometheus.yml         # Metrics config
+│   ├── .dockerignore          # Build optimization
+│   └── README.md              # Docker guide
 ├── scripts/
 │   ├── build_cuda_wsl.sh      # CUDA build script
 │   ├── build_cpu_wsl.sh       # CPU build script
-│   └── WSL_SETUP.md           # WSL setup guide
+│   └── upgrade_cuda_wsl.sh    # CUDA upgrade script
 ├── Cargo.toml                 # Dependencies
 ├── config.example.toml        # Example config
-├── docker-compose.yml         # Docker stack
-├── Dockerfile                 # CPU image
-├── Dockerfile.cuda            # GPU image
-├── prometheus.yml             # Metrics config
+├── postman_collection.json    # API tests
 └── README.md                  # Quick start
 ```
 
