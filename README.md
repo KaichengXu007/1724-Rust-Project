@@ -258,10 +258,6 @@ curl http://localhost:3000/readiness
 │   ├── docker-compose.yml     # Orchestration
 │   ├── prometheus.yml         # Metrics config
 │   └── README.md              # Docker guide
-├── scripts/
-│   ├── build_cuda_wsl.sh      # CUDA build script
-│   ├── build_cpu_wsl.sh       # CPU build script
-│   └── upgrade_cuda_wsl.sh    # CUDA upgrade script
 ├── Cargo.toml                 # Dependencies
 ├── config.example.toml        # Config template
 └── postman_collection.json    # API tests
