@@ -3,8 +3,8 @@
 A high-performance, production-ready Large Language Model (LLM) inference service built entirely in Rust. Provides OpenAI-compatible APIs with token streaming, session management, and a modern web UI.
 
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](Dockerfile)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](#-license)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docker/)
 
 ## ✨ Features
 
