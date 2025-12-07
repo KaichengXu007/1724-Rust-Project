@@ -4,14 +4,14 @@ services:
   # CPU-only service
   llm-cpu:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: rust-llm-cpu
     ports:
       - "3000:3000"
     volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./models:/app/models:ro
+      - ../config.toml:/app/config.toml:ro
+      - ../models:/app/models:ro
       - llm-data:/app/data
     environment:
       - RUST_LOG=info
@@ -26,14 +26,14 @@ services:
   # GPU-accelerated service (requires nvidia-docker)
   llm-gpu:
     build:
-      context: .
-      dockerfile: Dockerfile.cuda
+      context: ..
+      dockerfile: docker/Dockerfile.cuda
     container_name: rust-llm-gpu
     ports:
       - "3001:3000"
     volumes:
-      - ./config.toml:/app/config.toml:ro
-      - ./models:/app/models:ro
+      - ../config.toml:/app/config.toml:ro
+      - ../models:/app/models:ro
       - llm-data-gpu:/app/data
     environment:
       - RUST_LOG=info

@@ -152,7 +152,7 @@ default_rate_limit_per_minute = 60
 
 ## 🔌 API Usage
 
-See [API.md](API.md) for comprehensive documentation.
+See [API Reference](docs/API_REFERENCE.md) for comprehensive documentation.
 
 ### Examples
 
@@ -206,14 +206,14 @@ print(response.json()["text"])
 ### CPU Version
 
 ```bash
-docker build -t rust-llm:cpu .
+docker build -t rust-llm:cpu -f docker/Dockerfile .
 docker run -p 3000:3000 -v ./config.toml:/app/config.toml rust-llm:cpu
 ```
 
 ### GPU Version (CUDA)
 
 ```bash
-docker build -f Dockerfile.cuda -t rust-llm:cuda .
+docker build -f docker/Dockerfile.cuda -t rust-llm:cuda .
 docker run --gpus all -p 3000:3000 rust-llm:cuda
 ```
 
@@ -221,13 +221,13 @@ docker run --gpus all -p 3000:3000 rust-llm:cuda
 
 ```bash
 # CPU service
-docker-compose up llm-cpu
+docker-compose -f docker/docker-compose.yml up llm-cpu
 
 # GPU service
-docker-compose up llm-gpu
+docker-compose -f docker/docker-compose.yml up llm-gpu
 
 # With Prometheus + Grafana
-docker-compose up
+docker-compose -f docker/docker-compose.yml up
 ```
 
 Access services:
@@ -324,7 +324,6 @@ curl -H "Authorization: Bearer sk-your-secret-key-here" \
 │   ├── engine.rs              # Inference engine
 │   ├── engine_mock.rs         # Test mock
 │   ├── lib.rs                 # Library root
-│   ├── middleware.rs          # Auth, rate limiting
 │   ├── models.rs              # Data models
 │   ├── routes.rs              # HTTP handlers
 │   └── state.rs               # Application state
@@ -334,12 +333,22 @@ curl -H "Authorization: Bearer sk-your-secret-key-here" \
 │   └── middleware_tests.rs    # Middleware tests
 ├── public/
 │   └── index.html             # Web UI
+├── docs/
+│   ├── API_REFERENCE.md       # API documentation
+│   └── PROJECT_DOCUMENTATION.md # Complete guide
+├── docker/
+│   ├── Dockerfile             # CPU build
+│   ├── Dockerfile.cuda        # GPU build
+│   ├── docker-compose.yml     # Orchestration
+│   ├── prometheus.yml         # Metrics config
+│   └── README.md              # Docker guide
+├── scripts/
+│   ├── build_cuda_wsl.sh      # CUDA build script
+│   ├── build_cpu_wsl.sh       # CPU build script
+│   └── upgrade_cuda_wsl.sh    # CUDA upgrade script
 ├── Cargo.toml                 # Dependencies
 ├── config.example.toml        # Config template
-├── Dockerfile                 # CPU build
-├── Dockerfile.cuda            # GPU build
-├── docker-compose.yml         # Orchestration
-└── API.md                     # API documentation
+└── postman_collection.json    # API tests
 ```
 
 ### Adding a New Model
@@ -376,7 +385,9 @@ cargo build --release --features flash-attn
 
 ## 📚 Additional Resources
 
-- **[API Documentation](API.md)**: Full endpoint reference
+- **[API Reference](docs/API_REFERENCE.md)**: Complete endpoint documentation
+- **[Project Documentation](docs/PROJECT_DOCUMENTATION.md)**: Full setup and deployment guide
+- **[Docker Guide](docker/README.md)**: Container deployment instructions
 - **[Postman Collection](postman_collection.json)**: Ready-to-use API tests
 - **[mistral.rs](https://github.com/EricLBuehler/mistral.rs)**: Underlying inference engine
 - **[Candle](https://github.com/huggingface/candle)**: ML framework
