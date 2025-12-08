@@ -42,7 +42,19 @@ async fn main() -> anyhow::Result<()> {
         
         info!("📦 Available models: {:?}", available_models);
         
-        let engine = Arc::new(M1EngineAdapter::new(available_models));
+        let engine = Arc::new(M1EngineAdapter::new(available_models.clone()));
+
+        // Pre-warm all models
+        let device = if cfg!(feature = "cuda") { "cuda" } else { "cpu" };
+        info!("🔥 Pre-warming {} models on {}", available_models.len(), device);
+        for model in &available_models {
+            info!("🔥 Loading model: {}", model);
+            if let Err(e) = engine.warmup(model, device).await {
+                tracing::warn!("⚠️ Failed to pre-warm model {}: {:?}", model, e);
+            } else {
+                info!("✅ Model cached: {}", model);
+            }
+        }
 
         // Initialize AppState
         let state = AppState::new(engine, handle, config.clone());
@@ -57,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
         let app = routes::router()
             .with_state(state)
             .layer(cors)
-            .fallback_service(ServeDir::new("public"));
+            .fallback_service(ServeDir::new("frontend/dist"));
 
         // Bind and serve
         let addr = SocketAddr::from((

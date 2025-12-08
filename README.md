@@ -1,17 +1,26 @@
 # 🚀 Rust LLM Inference Service
 
-A high-performance, production-ready Large Language Model (LLM) inference service built entirely in Rust. Provides OpenAI-compatible APIs with token streaming, session management, and a modern web UI.
+A high-performance, production-ready Large Language Model (LLM) inference service built with Rust backend and React frontend. Provides OpenAI-compatible APIs with real-time token streaming, session management, and a modern web UI.
 
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
+[![React](https://img.shields.io/badge/react-19.2.0-blue.svg)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/typescript-5.x-blue.svg)](https://www.typescriptlang.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docker/)
 
 ## ✨ Features
 
 ### 🎯 Core Capabilities
 - **Multiple Model Support**: Load and manage multiple GGUF-format models via Candle
-- **Streaming Inference**: Real-time token streaming via Server-Sent Events (SSE) and WebSocket
-- **Session Management**: Stateful conversations with configurable context limits
-- **Modern Web UI**: Built-in chat interface with markdown rendering, dark mode, and message editing
+- **Streaming Inference**: Real-time token streaming via WebSocket with tokens/second display
+- **Session Management**: Stateful conversations with full history and session switching
+- **Modern React UI**: 
+  - Built with React 19 + TypeScript + Vite
+  - Zustand state management
+  - Tailwind CSS v3 for styling
+  - Real-time markdown rendering with syntax highlighting
+  - Code copy buttons and dark mode
+  - Session history with export functionality
+  - Advanced model settings panel
 
 ### 🔒 Security & Governance
 - **API Key Authentication**: Optional token-based authentication
@@ -43,8 +52,9 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      Web UI (HTML/JS)                       │
-│                  Markdown • Dark Mode • SSE                 │
+│                React Frontend (TypeScript)                  │
+│   Vite • Zustand • Tailwind CSS • React Markdown           │
+│   WebSocket • Code Highlighting • Session Management        │
 └────────────────────────┬────────────────────────────────────┘
                          │ HTTP/WS
 ┌────────────────────────▼────────────────────────────────────┐
@@ -65,11 +75,19 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
 ```
 
 **Key Components**:
-- **`routes.rs`**: HTTP endpoints, SSE/WebSocket handlers
-- **`engine.rs`**: Inference abstraction, model management
-- **`state.rs`**: Application state, session persistence
-- **`middleware.rs`**: Auth, rate limiting, validation
-- **`config.rs`**: TOML configuration parsing
+- **Frontend**:
+  - **`App.tsx`**: Root component with session lifecycle management
+  - **`Sidebar.tsx`**: Session list, settings panel, export functionality
+  - **`ChatContainer.tsx`**: Main chat interface with auto-scroll
+  - **`Message.tsx`**: Markdown rendering with syntax highlighting
+  - **`chatStore.ts`**: Zustand state management (12 actions)
+  - **`api.ts`**: API service layer with WebSocket support
+  - **`useWebSocket.ts`**: WebSocket hook for streaming
+- **Backend**:
+  - **`routes.rs`**: HTTP endpoints, WebSocket handlers
+  - **`engine.rs`**: Inference abstraction, model management
+  - **`state.rs`**: Application state, session persistence
+  - **`server.rs`**: Entry point with model pre-warming
 
 ---
 
@@ -77,7 +95,8 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
 
 ### Prerequisites
 - **Rust** 1.75+ (`rustup` recommended)
-- **(Optional)** NVIDIA GPU + CUDA Toolkit 12.2+ for GPU acceleration
+- **Node.js** 18+ and npm (for frontend development)
+- **(Optional)** NVIDIA GPU + CUDA Toolkit 12.1+ for GPU acceleration
 - **(Optional)** Docker for containerized deployment
 
 ### Installation
@@ -88,13 +107,21 @@ git clone https://github.com/KaichengXu007/1724-Rust-Project.git
 cd 1724-Rust-Project
 ```
 
-2. **Create configuration** (optional):
+2. **Build the frontend**:
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+3. **Create configuration** (optional):
 ```bash
 cp config.example.toml config.toml
 # Edit config.toml to customize settings
 ```
 
-3. **Run the service**:
+4. **Run the service**:
 
 **CPU Mode**:
 ```bash
@@ -106,8 +133,19 @@ cargo run --release --bin server
 cargo run --release --features cuda --bin server
 ```
 
-4. **Access the web UI**:
+5. **Access the web UI**:
 Open your browser to `http://localhost:3000`
+
+### Frontend Development
+
+To run the frontend in development mode with hot reload:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Then run the backend server separately. The Vite dev server will proxy API requests to the backend.
 
 ---
 
@@ -233,34 +271,51 @@ curl http://localhost:3000/readiness
 
 ```
 .
-├── src/
+├── frontend/                   # React frontend
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── ChatContainer.tsx  # Main chat UI
+│   │   │   ├── Message.tsx        # Message rendering
+│   │   │   └── Sidebar.tsx        # Session & settings
+│   │   ├── hooks/
+│   │   │   └── useWebSocket.ts    # WebSocket streaming
+│   │   ├── services/
+│   │   │   └── api.ts             # API client
+│   │   ├── store/
+│   │   │   └── chatStore.ts       # Zustand state
+│   │   ├── App.tsx                # Root component
+│   │   └── index.css              # Tailwind styles
+│   ├── dist/                   # Production build
+│   ├── package.json            # Dependencies
+│   ├── tsconfig.json           # TypeScript config
+│   ├── tailwind.config.js      # Tailwind config
+│   └── vite.config.ts          # Vite config
+├── src/                        # Rust backend
 │   ├── bin/
-│   │   └── server.rs          # Entry point
-│   ├── config.rs              # Configuration
-│   ├── engine.rs              # Inference engine
-│   ├── engine_mock.rs         # Test mock
-│   ├── lib.rs                 # Library root
-│   ├── models.rs              # Data models
-│   ├── routes.rs              # HTTP handlers
-│   └── state.rs               # Application state
+│   │   └── server.rs           # Entry point
+│   ├── config.rs               # Configuration
+│   ├── engine.rs               # Inference engine
+│   ├── engine_mock.rs          # Test mock
+│   ├── lib.rs                  # Library root
+│   ├── models.rs               # Data models
+│   ├── routes.rs               # HTTP handlers
+│   └── state.rs                # Application state
 ├── tests/
-│   ├── integration_tests.rs   # API tests
-│   ├── config_tests.rs        # Config tests
-│   └── middleware_tests.rs    # Middleware tests
-├── public/
-│   └── index.html             # Web UI
+│   ├── integration_tests.rs    # API tests
+│   ├── config_tests.rs         # Config tests
+│   └── middleware_tests.rs     # Middleware tests
 ├── docs/
-│   ├── API_REFERENCE.md       # API documentation
+│   ├── API_REFERENCE.md        # API documentation
 │   └── PROJECT_DOCUMENTATION.md # Complete guide
 ├── docker/
-│   ├── Dockerfile             # CPU build
-│   ├── Dockerfile.cuda        # GPU build
-│   ├── docker-compose.yml     # Orchestration
-│   ├── prometheus.yml         # Metrics config
-│   └── README.md              # Docker guide
-├── Cargo.toml                 # Dependencies
-├── config.example.toml        # Config template
-└── postman_collection.json    # API tests
+│   ├── Dockerfile              # CPU build
+│   ├── Dockerfile.cuda         # GPU build
+│   ├── docker-compose.yml      # Orchestration
+│   ├── prometheus.yml          # Metrics config
+│   └── README.md               # Docker guide
+├── Cargo.toml                  # Rust dependencies
+├── config.example.toml         # Config template
+└── postman_collection.json     # API tests
 ```
 
 ### Adding a New Model
@@ -311,6 +366,10 @@ cargo build --release --features flash-attn
 - **[mistral.rs](https://github.com/EricLBuehler/mistral.rs)**: High-performance Rust inference
 - **[Candle](https://github.com/huggingface/candle)**: Minimalist ML framework
 - **[Axum](https://github.com/tokio-rs/axum)**: Ergonomic web framework
-- **Rust Community**: For amazing tooling and libraries
+- **[React](https://reactjs.org/)**: UI library for building interactive interfaces
+- **[Vite](https://vitejs.dev/)**: Next-generation frontend tooling
+- **[Zustand](https://github.com/pmndrs/zustand)**: Simple state management
+- **[Tailwind CSS](https://tailwindcss.com/)**: Utility-first CSS framework
+- **Rust & TypeScript Communities**: For amazing tooling and libraries
 
 ---

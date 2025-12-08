@@ -1,6 +1,6 @@
 # Rust LLM Inference Service
 
-Complete documentation for the Rust LLM Inference Service - a production-ready, OpenAI-compatible LLM inference server with GPU acceleration.
+Complete documentation for the Rust LLM Inference Service - a production-ready, OpenAI-compatible LLM inference server with GPU acceleration and modern React frontend.
 
 ---
 
@@ -9,8 +9,9 @@ Complete documentation for the Rust LLM Inference Service - a production-ready, 
 - [Overview](#overview)
 - [Features](#features)
 - [Getting Started](#getting-started)
+- [Frontend Architecture](#frontend-architecture)
+- [Backend Architecture](#backend-architecture)
 - [Configuration](#configuration)
-- [Architecture](#architecture)
 - [Deployment](#deployment)
 - [Development](#development)
 - [Testing](#testing)
@@ -21,35 +22,83 @@ Complete documentation for the Rust LLM Inference Service - a production-ready, 
 
 ## Overview
 
-The Rust LLM Inference Service is a high-performance, production-ready server for running large language models locally with GPU acceleration. It provides OpenAI-compatible APIs, real-time streaming, session management, and enterprise-grade security features.
+The Rust LLM Inference Service is a high-performance, production-ready server for running large language models locally with GPU acceleration. It features a React + TypeScript frontend and Rust backend, providing OpenAI-compatible APIs, real-time streaming, session management, and enterprise-grade security features.
 
 **Key Highlights**:
 - 🚀 **GPU Accelerated**: CUDA support for NVIDIA GPUs (10-50x faster than CPU)
-- 🔄 **Real-time Streaming**: WebSocket and SSE streaming for instant responses
+- ⚛️ **Modern React UI**: TypeScript + Vite + Tailwind CSS + Zustand
+- 🔄 **Real-time Streaming**: WebSocket streaming with live token generation
 - 💬 **Session Management**: Multi-session support with persistent conversation history
 - 🔒 **Enterprise Security**: API key authentication, rate limiting, content validation
 - 📊 **Observability**: Prometheus metrics, health checks, structured logging
 - 🐳 **Cloud Native**: Docker containers with GPU support
-- 🎨 **Modern Web UI**: Built-in chat interface with advanced parameter controls
+- 🎨 **Rich UI Features**: Markdown rendering, syntax highlighting, export history
 
 ---
 
 ## Features
 
-### Core Capabilities
+### Frontend Capabilities
+
+#### 1. Modern React Architecture
+- **React 19**: Latest React with TypeScript
+- **Vite**: Lightning-fast build tool with hot module replacement
+- **Zustand**: Simple and scalable state management
+- **Tailwind CSS v3**: Utility-first styling with custom animations
+- **Component Structure**:
+  - `App.tsx`: Root component with session lifecycle
+  - `Sidebar.tsx`: Session list, settings, export (303 lines)
+  - `ChatContainer.tsx`: Main chat UI with auto-scroll (120 lines)
+  - `Message.tsx`: Markdown rendering with code highlighting (85 lines)
+
+#### 2. Real-time Communication
+- **WebSocket Hook**: Custom `useWebSocket` for streaming
+- **Live Token Display**: Real-time tokens/second calculation
+- **Auto-scroll**: Smart scrolling that preserves user position
+- **Stop Generation**: Cancel in-progress responses
+- **Connection Status**: Visual indicator for WebSocket state
+
+#### 3. Rich Text Features
+- **Markdown Rendering**: Full markdown support with `react-markdown`
+- **Syntax Highlighting**: Code blocks with `rehype-highlight`
+- **Copy Code Buttons**: One-click copy for code blocks
+- **GitHub Dark Theme**: Professional code styling
+- **Inline Code**: Styled inline code elements
+
+#### 4. Session Management UI
+- **Session List**: Sidebar showing all sessions (first 8 chars of UUID)
+- **Active Highlighting**: Visual indicator for current session
+- **Quick Switching**: Click to switch between sessions
+- **Delete Sessions**: Remove with confirmation dialog
+- **Export History**: Download chat as JSON with metadata
+- **New Chat Button**: Create new sessions instantly
+
+#### 5. Advanced Settings Panel
+- **Model Selection**: Dropdown for available models
+- **Device Selection**: Choose CPU or CUDA
+- **Temperature Control**: Slider (0.1 - 2.0)
+- **Top-P Sampling**: Nucleus sampling control
+- **Top-K Sampling**: Integer input for top-k
+- **Max Tokens**: Response length limit
+- **Repeat Penalty**: Duplicate word control
+- **System Prompt**: Custom system instructions
+- **Reset Defaults**: One-click restore to defaults
+
+### Backend Capabilities (Rust)
 
 #### 1. High-Performance Inference
 - **mistral.rs Engine**: Industry-leading Rust inference engine
-- **GPU Acceleration**: CUDA support for NVIDIA GPUs
+- **GPU Acceleration**: CUDA 12.1+ support for NVIDIA GPUs
+- **Model Pre-warming**: Both models load on server startup
 - **CPU Fallback**: Automatic fallback when GPU unavailable
-- **Metal Support**: macOS GPU acceleration
-- **Lazy Loading**: Models load on first request and cached
-- **Multiple Models**: Support for Qwen, Phi-3.5, and compatible models
+- **Metal Support**: macOS GPU acceleration (optional)
+- **Lazy Loading**: Models cached after first load
+- **Multiple Models**: Support for Qwen, Phi-3.5, and compatible GGUF models
 
 #### 2. Web Service & APIs
 - **REST API**: `/completions` and `/chat/completions` endpoints
 - **WebSocket**: Real-time bidirectional streaming at `/chat/ws`
-- **SSE Streaming**: Server-Sent Events for HTTP streaming
+- **Static Files**: Serves frontend from `frontend/dist/`
 - **OpenAI Compatible**: Drop-in replacement for OpenAI API
 - **Full Parameter Control**:
   - Temperature (0-2)
@@ -61,30 +110,19 @@ The Rust LLM Inference Service is a high-performance, production-ready server fo
   - Stop sequences
 
 #### 3. Session Management
-- **Multi-Session**: Independent conversation threads
+- **Multi-Session**: Independent conversation threads with UUIDs
 - **Persistent Storage**: History saved to `sessions.json`
 - **Auto-Trimming**: Keep last 20 messages to prevent context overflow
-- **History API**: Query and manage conversation history
-- **Session Rollback**: Rewind conversations to previous states
-
-#### 4. Modern Web Interface
-- **Dark Mode**: Professional dark theme
-- **Markdown Support**: Rich text formatting and code highlighting
-- **Advanced Settings Panel**: Full control over generation parameters
-- **Live Statistics**: Token counter with tokens/s display
-- **Code Features**: Syntax highlighting and copy buttons
-- **Message Controls**: Stop, regenerate, edit capabilities
-- **Session Sidebar**: Create, switch, delete sessions
-- **Export/Import**: Save and restore conversation history
-
-#### 5. Security & Governance
+- **History API**: Query and manage conversation history via REST
+- **Session CRUD**: Create, read, update, delete operations
+#### 4. Security & Governance
 - **API Key Authentication**: Bearer token support
 - **Rate Limiting**: Per-key or per-IP request throttling
 - **Content Validation**: Prompt and response length limits
 - **CORS Support**: Configurable cross-origin policies
 - **Input Sanitization**: Protection against malicious inputs
 
-#### 6. Observability
+#### 5. Observability
 - **Prometheus Metrics**: Comprehensive performance tracking
 - **Health Checks**: `/health` and `/readiness` endpoints
 - **Structured Logging**: Configurable log levels
@@ -95,7 +133,7 @@ The Rust LLM Inference Service is a high-performance, production-ready server fo
   - Error rates
   - Session statistics
 
-#### 7. Deployment
+#### 6. Deployment
 - **Docker Support**: Multi-stage builds for CPU and GPU
 - **Docker Compose**: Integrated stack with Prometheus and Grafana
 - **Health Probes**: Container-level health checking
@@ -109,6 +147,7 @@ The Rust LLM Inference Service is a high-performance, production-ready server fo
 ### Prerequisites
 
 - **Rust**: 1.75+ ([Install Rust](https://rustup.rs/))
+- **Node.js**: 18+ and npm ([Install Node.js](https://nodejs.org/))
 - **Git**: For cloning repository
 - **(Optional)** NVIDIA GPU with CUDA 12.1+ for GPU acceleration
 - **(Optional)** Docker for containerized deployment
@@ -122,17 +161,37 @@ The Rust LLM Inference Service is a high-performance, production-ready server fo
 git clone https://github.com/KaichengXu007/1724-Rust-Project.git
 cd 1724-Rust-Project
 
-# Run with GPU (recommended)
+# Build frontend
+cd frontend
+npm install
+npm run build
+cd ..
+
+# Run backend with GPU (recommended)
 cargo run --release --features cuda --bin server
 
-# OR run with CPU only
+# OR run backend with CPU only
 cargo run --release --bin server
 
 # Open browser
 # Navigate to http://localhost:3000
 ```
 
-#### Option 2: Docker
+#### Option 2: Frontend Development Mode
+
+For hot reload during frontend development:
+
+```bash
+# Terminal 1: Run backend
+cargo run --release --features cuda --bin server
+
+# Terminal 2: Run frontend dev server
+cd frontend
+npm run dev
+# Frontend will be available at http://localhost:5173
+```
+
+#### Option 3: Docker
 
 ```bash
 # Clone repository
@@ -151,13 +210,13 @@ docker-compose -f docker/docker-compose.yml up llm-cpu
 
 The service will:
 - Start on port 3000
-- Load models on first request
-- Use sensible defaults
+- Serve the React frontend from `frontend/dist/`
+- Pre-warm models on startup
 - Create sessions automatically
 
 ### First Request
 
-Test with cURL:
+Test the API with cURL:
 ```bash
 curl -X POST http://localhost:3000/completions \
   -H "Content-Type: application/json" \
@@ -231,14 +290,139 @@ export DEFAULT_DEVICE=cuda
 
 ---
 
-## Architecture
+## Frontend Architecture
+
+### Technology Stack
+
+- **React 19**: Latest React with concurrent features
+- **TypeScript 5.x**: Type-safe code
+- **Vite 7.2**: Fast build tool with HMR
+- **Zustand 5.0**: Lightweight state management
+- **Tailwind CSS 3**: Utility-first styling
+- **react-markdown 10.1**: Markdown rendering
+- **rehype-highlight 7.0**: Syntax highlighting
+
+### Component Hierarchy
+
+```
+App.tsx (Root Component)
+├── Sidebar.tsx
+│   ├── Header with Logo
+│   ├── New Chat Button
+│   ├── Export History Button
+│   ├── Session List
+│   │   └── SessionItem (with delete button)
+│   └── Settings Panel
+│       ├── Model Selection
+│       ├── Device Selection
+│       ├── Temperature Slider
+│       ├── Top-P Input
+│       ├── Top-K Input
+│       ├── Max Tokens Input
+│       ├── Repeat Penalty Input
+│       ├── System Prompt Textarea
+│       └── Reset Button
+└── ChatContainer.tsx
+    ├── Welcome Screen (when no messages)
+    ├── Message List
+    │   └── Message.tsx (for each message)
+    │       ├── ReactMarkdown
+    │       ├── Code Blocks with Copy Button
+    │       └── Typing Indicator
+    ├── Stop Generation Button (when generating)
+    └── Input Area
+        ├── Auto-resizing Textarea
+        └── Send Button
+```
+
+### State Management (Zustand)
+
+**Store Structure** (`chatStore.ts`):
+```typescript
+{
+  // Session
+  sessionId: string,
+  sessions: string[],
+  messages: Message[],
+  
+  // Generation
+  isGenerating: boolean,
+  isConnected: boolean,
+  tokenCount: number,
+  tokensPerSecond: number,
+  
+  // Settings
+  settings: ChatSettings,
+  
+  // Actions (12 total)
+  setSessionId, setMessages, addMessage,
+  updateLastMessage, setSessions, addSession,
+  removeSession, updateSettings, resetSettings,
+  setIsGenerating, setIsConnected, setTokenCount,
+  setTokensPerSecond, clearMessages
+}
+```
+
+### API Service Layer
+
+**`api.ts`** provides:
+- `getSessions()`: Fetch all session IDs
+- `deleteSession(id)`: Delete a session
+- `getHistory(id)`: Load conversation history
+- `rollbackHistory(id, amount)`: Remove last N messages
+- `createWebSocket()`: Create WebSocket connection
+
+### WebSocket Hook
+
+**`useWebSocket.ts`** handles:
+- Connection management with auto-reconnect
+- Message sending with settings
+- Token streaming
+- Tokens/second calculation
+- Stop generation
+- Connection status updates
+
+### Key Features
+
+1. **Auto-scroll**: Scrolls to bottom on new messages, preserves position when user scrolls up
+2. **Code Highlighting**: GitHub Dark theme with copy buttons on hover
+3. **Session Persistence**: Sessions stored in backend, synced with UI
+4. **Export History**: Downloads JSON with messages, settings, and metadata
+5. **Responsive Settings**: All changes update in real-time
+6. **Error Handling**: Graceful fallbacks for API failures
+
+---
+
+## Backend Architecture
 
 ### System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        Client Layer                         │
-│  (Web Browser, cURL, Python, JavaScript, Postman, etc.)    │
+│       (React Frontend, cURL, Python, JavaScript, etc.)      │
+└────────────────────────┬────────────────────────────────────┘
+                         │ HTTP/WebSocket
+┌────────────────────────▼────────────────────────────────────┐
+│                    Axum Web Server                          │
+│              Static Files • Routes • Middleware              │
+├─────────────────────────────────────────────────────────────┤
+│  GET /              → frontend/dist/index.html              │
+│  GET /sessions      → List all session IDs                  │
+│  POST /completions  → Generate completion                   │
+│  WS /chat/ws        → Real-time streaming                   │
+│  DELETE /chat/history/:id → Delete session                  │
+├─────────────────────────────────────────────────────────────┤
+│                Application State (Arc<RwLock>)              │
+│         Session Manager • Model Cache • Rate Limiters        │
+├─────────────────────────────────────────────────────────────┤
+│              M1 Engine Adapter (mistral.rs)                 │
+│         Model Loader • Tokenization • Sampling              │
+├─────────────────────────────────────────────────────────────┤
+│                   Candle ML Framework                       │
+│              CUDA • Metal • CPU • Quantization              │
+└─────────────────────────────────────────────────────────────┘
+```
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼

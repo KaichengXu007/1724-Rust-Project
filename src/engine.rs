@@ -38,6 +38,14 @@ impl M1EngineAdapter {
         }
     }
 
+    /// Pre-warm the model by loading it into cache
+    pub async fn warmup(&self, model_id: &str, device: &str) -> AnyResult<()> {
+        tracing::info!("🔥 Pre-warming model: {} on device: {}", model_id, device);
+        self.get_or_load_model(model_id, device).await?;
+        tracing::info!("✅ Model pre-warmed and cached: {}", model_id);
+        Ok(())
+    }
+
     /// 内部：根据 model_id 懒加载模型并缓存
     async fn get_or_load_model(&self, model_id: &str, device: &str) -> AnyResult<Arc<Model>> {
         // check cache first
