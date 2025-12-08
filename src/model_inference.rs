@@ -1,10 +1,11 @@
 use crate::parse;
+use crate::parse;
 use anyhow::{Context, Result};
-use mistralrs::{ChatCompletionChunkResponse, ChunkChoice, Delta, Response};
 use mistralrs::{
     Device, IsqType, PagedAttentionMetaBuilder, RequestBuilder, StopTokens, TextMessageRole,
     TextMessages, TextModelBuilder,
 };
+use mistralrs::{ChatCompletionChunkResponse, ChunkChoice, Delta, Response};
 use parse::Args;
 use tokio::io::{AsyncWriteExt, stdout};
 
@@ -21,10 +22,16 @@ pub async fn run(args: Args) -> Result<()> {
     // if exist, load from local cache else download and load
     let model_id = &args.model_name;
 
+    // format : hf id
+    // if exist, load from local cache else download and load
+    let model_id = &args.model_name;
+
     let builder = TextModelBuilder::new(model_id)
         .with_device(parse_device(&args.device))
         .with_isq(IsqType::Q4_0)
+        .with_isq(IsqType::Q4_0)
         .with_logging()
+        .with_paged_attn(|| PagedAttentionMetaBuilder::default().build())?;
         .with_paged_attn(|| PagedAttentionMetaBuilder::default().build())?;
 
     let model = builder
@@ -33,6 +40,7 @@ pub async fn run(args: Args) -> Result<()> {
         .context("failed to build/load model")?;
 
     println!("model loaded");
+
 
     let messages = TextMessages::new().add_message(TextMessageRole::User, &args.prompt);
 
