@@ -1,14 +1,14 @@
 use crate::parse;
 use anyhow::{Context, Result};
-use mistralrs::{
-    AutoDeviceMapParams, Device, DeviceMapSetting, IsqType, Model, PagedAttentionMetaBuilder,
-    RequestBuilder, StopTokens, TextMessageRole, TextMessages, TextModelBuilder,
-};
 use mistralrs::{ChatCompletionChunkResponse, ChunkChoice, Delta, Response};
+use mistralrs::{
+    Device, IsqType, PagedAttentionMetaBuilder, RequestBuilder, StopTokens, TextMessageRole,
+    TextMessages, TextModelBuilder,
+};
 use parse::Args;
-use tokio::io::{stdout, AsyncWriteExt};
+use tokio::io::{AsyncWriteExt, stdout};
 
-fn parse_device(s: &str) -> Device {
+pub fn parse_device(s: &str) -> Device {
     match s.to_lowercase().as_str() {
         "cuda" => Device::cuda_if_available(0).unwrap_or(Device::Cpu),
         "metal" => Device::new_metal(0).unwrap_or(Device::Cpu),

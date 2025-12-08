@@ -4,7 +4,7 @@ use std::env;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    env::set_var("RUST_BACKTRACE", "1");
+    // env::set_var("RUST_BACKTRACE", "1");
 
 
 
@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
   "top-k": 10,
   "repeat-penalty": 1.1,
   "stop": [],
-  "device": "metal"
+  "device": "cuda"
 }
 "#;
 
@@ -28,5 +28,8 @@ async fn main() -> Result<()> {
     println!("{args:#?}");
 
     model_inference::run(args).await?;
+    // let n = model_inference::parse_device("cuda");
+    // println!("{:#?}", n);
     Ok(())
+
 }
