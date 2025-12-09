@@ -1,0 +1,50 @@
+# Rust LLM Inference Service Configuration
+# Copy this to config.toml and customize for your deployment
+
+[server]
+host = "127.0.0.1"
+port = 3000
+log_level = "info"  # trace, debug, info, warn, error
+
+[models]
+# Optional: Directory containing local model files
+# model_dir = "/path/to/models"
+
+default_device = "cuda"  # cuda, cpu, metal
+max_concurrent_requests = 10
+
+# Available models configuration
+[[models.available_models]]
+id = "qwen"
+name = "Qwen/Qwen2.5-0.5B-Instruct"
+# path = "/path/to/local/model"  # Optional: local model path
+# quantization = "q4"  # Optional: q4, q8, bf16
+context_length = 4096
+
+[[models.available_models]]
+id = "phi"
+name = "microsoft/Phi-3.5-mini-instruct"
+context_length = 4096
+
+[security]
+enable_auth = false  # Set to true to require API keys
+allowed_origins = ["*"]  # CORS configuration
+
+# API Keys - only used if enable_auth = true
+# [[security.api_keys]]
+# key = "sk-your-secret-key-here"
+# name = "default"
+# rate_limit_per_minute = 100
+# enabled = true
+
+[limits]
+max_prompt_length = 8192  # Maximum characters in prompt
+max_response_tokens = 2048  # Maximum tokens in response
+max_sessions = 1000  # Maximum concurrent sessions
+session_ttl_seconds = 3600  # Session timeout (1 hour)
+default_rate_limit_per_minute = 60  # Default rate limit without API key
+
+[observability]
+enable_metrics = true  # Prometheus metrics
+enable_tracing = true  # Structured logging
+metrics_path = "/metrics"

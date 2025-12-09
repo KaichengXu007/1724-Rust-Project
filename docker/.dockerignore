@@ -1,0 +1,8 @@
+# Docker deployment instructions
+.dockerignore
+target/
+.git/
+.gitignore
+*.md
+sessions.json
+Cargo.lock
