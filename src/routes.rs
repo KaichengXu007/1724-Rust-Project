@@ -219,7 +219,7 @@ async fn completions(
         device: state.config.models.default_device.clone(),
     };
 
-    match state.engine.run_streaming_inference(inference_req).await {
+    match state.run_inference_guarded(inference_req).await {
         Ok(mut stream) => {
             if req.stream {
                 // Return SSE stream
@@ -369,7 +369,7 @@ async fn chat_completions(
     }
 
     // call engine to get TokenStream
-    match state.engine.run_streaming_inference(req).await {
+    match state.run_inference_guarded(req).await {
         Ok(mut stream) => {
             let sessions = state.sessions.clone();
             let sid_clone = session_id.clone();
@@ -491,7 +491,7 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
                 }
 
                 // Run inference
-                if let Ok(mut stream) = state.engine.run_streaming_inference(req).await {
+                if let Ok(mut stream) = state.run_inference_guarded(req).await {
                     let mut full_response = String::new();
                     let mut session_cancelled = false;
 

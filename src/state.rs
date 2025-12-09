@@ -1,11 +1,15 @@
 use crate::config::Config;
-use crate::engine::InferenceEngine;
-use crate::models::ChatMessage;
-use anyhow::Result;
+use crate::engine::{InferenceEngine, TokenStream};
+use crate::models::{ChatMessage, InferenceRequest};
+use anyhow::{anyhow, Result};
+use async_stream::stream;
+use futures_util::{FutureExt, StreamExt};
 use metrics_exporter_prometheus::PrometheusHandle;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use sqlx::Row;
+use std::any::Any;
 use std::collections::HashMap;
+use std::panic::AssertUnwindSafe;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -188,5 +192,48 @@ impl AppState {
             );
         }
         Ok(())
+    }
+
+    pub async fn run_inference_guarded(&self, req: InferenceRequest) -> Result<TokenStream> {
+        let fut = AssertUnwindSafe(self.engine.run_streaming_inference(req));
+        match fut.catch_unwind().await {
+            Ok(result) => result.map(Self::guard_stream),
+            Err(payload) => {
+                let reason = panic_message(payload);
+                error!("Inference engine panicked: {}", reason);
+                Err(anyhow!("Inference engine panicked"))
+            }
+        }
+    }
+
+    fn guard_stream(stream: TokenStream) -> TokenStream {
+        Box::pin(stream! {
+            let mut inner = stream;
+            loop {
+                let next = AssertUnwindSafe(inner.next()).catch_unwind().await;
+                match next {
+                    Ok(Some(item)) => {
+                        yield item;
+                    }
+                    Ok(None) => break,
+                    Err(payload) => {
+                        let reason = panic_message(payload);
+                        error!("Inference stream panicked: {}", reason);
+                        yield Err(anyhow!("Inference engine panicked"));
+                        break;
+                    }
+                }
+            }
+        })
+    }
+}
+
+fn panic_message(payload: Box<dyn Any + Send>) -> String {
+    if let Some(msg) = payload.downcast_ref::<&str>() {
+        msg.to_string()
+    } else if let Some(msg) = payload.downcast_ref::<String>() {
+        msg.clone()
+    } else {
+        "unknown panic".to_string()
     }
 }

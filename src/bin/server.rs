@@ -37,14 +37,13 @@ async fn main() -> anyhow::Result<()> {
         info!("🤖 Initializing Inference Engine...");
 
         // Load available models from config
-        let available_models: Vec<String> = config
-            .models
-            .available_models
+        let available_models = config.models.available_models.clone();
+        let model_labels: Vec<String> = available_models
             .iter()
-            .map(|m| m.name.clone())
+            .map(|m| format!("{} ({})", m.name, m.id))
             .collect();
 
-        info!("📦 Available models: {:?}", available_models);
+        info!("📦 Available models: {:?}", model_labels);
 
         let engine = Arc::new(M1EngineAdapter::new(available_models.clone()));
 
@@ -60,11 +59,11 @@ async fn main() -> anyhow::Result<()> {
             device
         );
         for model in &available_models {
-            info!("🔥 Loading model: {}", model);
-            if let Err(e) = engine.warmup(model, device).await {
-                tracing::warn!("⚠️ Failed to pre-warm model {}: {:?}", model, e);
+            info!("🔥 Loading model: {} ({})", model.name, model.id);
+            if let Err(e) = engine.warmup(&model.id, device).await {
+                tracing::warn!("⚠️ Failed to pre-warm model {}: {:?}", model.name, e);
             } else {
-                info!("✅ Model cached: {}", model);
+                info!("✅ Model cached: {}", model.name);
             }
         }
 

@@ -1,20 +1,21 @@
+use crate::config::ModelConfig;
 use crate::models::InferenceRequest;
-use anyhow::Context;
 use anyhow::Result as AnyResult;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use futures_util::Stream;
 use std::sync::Arc;
 
-// Token 流的类型别名
+// another type name for TokenStream
 pub type TokenStream = std::pin::Pin<Box<dyn Stream<Item = AnyResult<String>> + Send>>;
 
-/// 推理引擎抽象 - 作为服务与底层推理逻辑之间的边界
+/// inference engine abtract between service and base
 #[async_trait]
 pub trait InferenceEngine: Send + Sync {
-    /// 获取可用模型列表（初期可以返回硬编码信息）
+    /// get available model list
     async fn get_available_models(&self) -> Vec<String>;
 
-    /// 执行流式推理，返回 token 流
+    /// run streaming inference and return TokenStream
     async fn run_streaming_inference(&self, request: InferenceRequest) -> AnyResult<TokenStream>;
 }
 
@@ -22,36 +23,61 @@ use mistralrs::{Device, Model, PagedAttentionMetaBuilder, TextModelBuilder};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
-/// M1 的适配器实现：将原先 CLI 风格的推理逻辑封装为服务可用的引擎
+/// M1 engine adapter realization
 pub struct M1EngineAdapter {
-    // 缓存已加载的模型实例：model_id -> TextModel
+    // cache loaded model canonical_id -> TextModel
     models: Mutex<HashMap<String, Arc<Model>>>,
-    // 可用模型（初期硬编码或从配置加载）
-    available: Vec<String>,
+    // canonical id -> ModelConfig
+    model_configs: HashMap<String, ModelConfig>,
+    // alias (id/name) -> canonical id
+    model_aliases: HashMap<String, String>,
+    // model name list for display
+    model_names: Vec<String>,
 }
 
 impl M1EngineAdapter {
-    pub fn new(available: Vec<String>) -> Self {
+    pub fn new(configs: Vec<ModelConfig>) -> Self {
+        let mut model_configs = HashMap::new();
+        let mut model_aliases = HashMap::new();
+        let mut model_names = Vec::new();
+
+        for config in configs {
+            model_aliases.insert(config.id.clone(), config.id.clone());
+            model_aliases.insert(config.name.clone(), config.id.clone());
+            model_names.push(config.name.clone());
+            model_configs.insert(config.id.clone(), config);
+        }
+
         Self {
             models: Mutex::new(HashMap::new()),
-            available,
+            model_configs,
+            model_aliases,
+            model_names,
         }
     }
 
     /// Pre-warm the model by loading it into cache
     pub async fn warmup(&self, model_id: &str, device: &str) -> AnyResult<()> {
-        tracing::info!("🔥 Pre-warming model: {} on device: {}", model_id, device);
-        self.get_or_load_model(model_id, device).await?;
-        tracing::info!("✅ Model pre-warmed and cached: {}", model_id);
+        let (canonical_id, config) = self.resolve_model(model_id)?;
+        tracing::info!(
+            "🔥 Pre-warming model: {} ({}) on device: {}",
+            config.name,
+            canonical_id,
+            device
+        );
+        self.get_or_load_model(&canonical_id, device).await?;
+        tracing::info!("✅ Model pre-warmed and cached: {}", config.name);
         Ok(())
     }
 
-    /// 内部：根据 model_id 懒加载模型并缓存
+    /// load model and cache
     async fn get_or_load_model(&self, model_id: &str, device: &str) -> AnyResult<Arc<Model>> {
+        let (canonical_id, config) = self.resolve_model(model_id)?;
+
         // check cache first
         {
             let guard = self.models.lock().await;
-            if let Some(m) = guard.get(model_id) {
+            if let Some(m) = guard.get(&canonical_id) {
                 return Ok(m.clone());
             }
         }
@@ -80,7 +106,13 @@ impl M1EngineAdapter {
             _ => Device::Cpu,
         };
 
-        let builder = TextModelBuilder::new(model_id)
+        let identifier = config
+            .path
+            .as_ref()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|| config.name.clone());
+
+        let builder = TextModelBuilder::new(&identifier)
             .with_device(dev)
             .with_logging()
             .with_paged_attn(|| PagedAttentionMetaBuilder::default().build())?;
@@ -91,15 +123,29 @@ impl M1EngineAdapter {
             .context("failed to build/load model")?;
         let arc = Arc::new(model);
         let mut guard = self.models.lock().await;
-        guard.insert(model_id.to_string(), arc.clone());
+        guard.insert(canonical_id, arc.clone());
         Ok(arc)
+    }
+
+    fn resolve_model(&self, model_id: &str) -> AnyResult<(String, ModelConfig)> {
+        let canonical_id = self
+            .model_aliases
+            .get(model_id)
+            .cloned()
+            .ok_or_else(|| anyhow!("Model '{}' not configured", model_id))?;
+        let config = self
+            .model_configs
+            .get(&canonical_id)
+            .cloned()
+            .ok_or_else(|| anyhow!("Model '{}' not configured", model_id))?;
+        Ok((canonical_id, config))
     }
 }
 
 #[async_trait]
 impl InferenceEngine for M1EngineAdapter {
     async fn get_available_models(&self) -> Vec<String> {
-        self.available.clone()
+        self.model_names.clone()
     }
 
     async fn run_streaming_inference(&self, request: InferenceRequest) -> AnyResult<TokenStream> {

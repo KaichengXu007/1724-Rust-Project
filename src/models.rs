@@ -7,7 +7,7 @@ pub struct ChatMessage {
     pub content: String,
 }
 
-/// Inference 请求结构，字段来源于原始的 parse::Args
+/// Inference request from original parse::Args
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct InferenceRequest {
@@ -70,7 +70,7 @@ fn default_device() -> String {
     "cpu".to_string()
 }
 
-/// 标准 API 返回的模型列表包装
+/// standard API return model list pack
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ModelsList {
     pub models: Vec<String>,
