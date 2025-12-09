@@ -111,7 +111,7 @@ The Rust LLM Inference Service is a high-performance, production-ready server fo
 
 #### 3. Session Management
 - **Multi-Session**: Independent conversation threads with UUIDs
-- **Persistent Storage**: History saved to `sessions.json`
+- **Persistent Storage**: History saved to SQLite (`sessions.db`)
 - **Auto-Trimming**: Keep last 20 messages to prevent context overflow
 - **History API**: Query and manage conversation history via REST
 - **Session CRUD**: Create, read, update, delete operations
@@ -546,13 +546,13 @@ docker build -t llm-service:gpu -f docker/Dockerfile.cuda .
 # CPU
 docker run -p 3000:3000 \
   -v $(pwd)/models:/app/models \
-  -v $(pwd)/sessions.json:/app/sessions.json \
+  -v $(pwd)/sessions.db:/app/sessions.db \
   llm-service:cpu
 
 # GPU
 docker run --gpus all -p 3000:3000 \
   -v $(pwd)/models:/app/models \
-  -v $(pwd)/sessions.json:/app/sessions.json \
+  -v $(pwd)/sessions.db:/app/sessions.db \
   llm-service:gpu
 ```
 

@@ -10,9 +10,10 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
 ## ✨ Features
 
 ### 🎯 Core Capabilities
-- **Multiple Model Support**: Load and manage multiple GGUF-format models via Candle
+- **Multiple Model Support**: Load and manage multiple Huggingface-format models via Candle and Mistral.rs
 - **Streaming Inference**: Real-time token streaming via WebSocket with tokens/second display
 - **Session Management**: Stateful conversations with full history and session switching
+  - SQLite-backed persistence with per-session durability
 - **Modern React UI**: 
   - Built with React 19 + TypeScript + Vite
   - Zustand state management

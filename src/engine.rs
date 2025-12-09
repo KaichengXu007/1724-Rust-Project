@@ -1,9 +1,9 @@
-use std::sync::Arc;
+use crate::models::InferenceRequest;
+use anyhow::Context;
+use anyhow::Result as AnyResult;
 use async_trait::async_trait;
 use futures_util::Stream;
-use anyhow::Result as AnyResult;
-use anyhow::Context;
-use crate::models::InferenceRequest;
+use std::sync::Arc;
 
 // Token 流的类型别名
 pub type TokenStream = std::pin::Pin<Box<dyn Stream<Item = AnyResult<String>> + Send>>;
@@ -18,7 +18,7 @@ pub trait InferenceEngine: Send + Sync {
     async fn run_streaming_inference(&self, request: InferenceRequest) -> AnyResult<TokenStream>;
 }
 
-use mistralrs::{Device, PagedAttentionMetaBuilder, TextModelBuilder, Model};
+use mistralrs::{Device, Model, PagedAttentionMetaBuilder, TextModelBuilder};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
@@ -68,11 +68,14 @@ impl M1EngineAdapter {
                         d
                     }
                     Err(e) => {
-                        tracing::warn!("⚠️ CUDA requested but not available: {:?}. Falling back to CPU.", e);
+                        tracing::warn!(
+                            "⚠️ CUDA requested but not available: {:?}. Falling back to CPU.",
+                            e
+                        );
                         Device::Cpu
                     }
                 }
-            },
+            }
             "metal" => Device::new_metal(0).unwrap_or(Device::Cpu),
             _ => Device::Cpu,
         };
@@ -82,7 +85,10 @@ impl M1EngineAdapter {
             .with_logging()
             .with_paged_attn(|| PagedAttentionMetaBuilder::default().build())?;
 
-        let model = builder.build().await.context("failed to build/load model")?;
+        let model = builder
+            .build()
+            .await
+            .context("failed to build/load model")?;
         let arc = Arc::new(model);
         let mut guard = self.models.lock().await;
         guard.insert(model_id.to_string(), arc.clone());
@@ -95,7 +101,7 @@ impl InferenceEngine for M1EngineAdapter {
     async fn get_available_models(&self) -> Vec<String> {
         self.available.clone()
     }
-    
+
     async fn run_streaming_inference(&self, request: InferenceRequest) -> AnyResult<TokenStream> {
         // Use cached model (or load) and create a stream using the model directly. This avoids
         // rebuilding models for every request and makes `get_or_load_model` actually used.
@@ -105,7 +111,7 @@ impl InferenceEngine for M1EngineAdapter {
         let model = self.get_or_load_model(&model_id, &device).await?;
 
         let mut messages = mistralrs::TextMessages::new();
-        
+
         if let Some(msgs) = &request.messages {
             for msg in msgs {
                 let role = match msg.role.to_lowercase().as_str() {

@@ -1,6 +1,6 @@
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use anyhow::{Context, Result};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
@@ -89,17 +89,39 @@ pub struct ObservabilityConfig {
 }
 
 // Default value functions
-fn default_host() -> String { "127.0.0.1".to_string() }
-fn default_port() -> u16 { 3000 }
-fn default_log_level() -> String { "info".to_string() }
-fn default_device() -> String { "cuda".to_string() }
-fn default_max_concurrent() -> usize { 10 }
-fn default_max_prompt_length() -> usize { 8192 }
-fn default_max_response_tokens() -> usize { 2048 }
-fn default_max_sessions() -> usize { 1000 }
-fn default_session_ttl() -> u64 { 3600 }
-fn default_rate_limit() -> u32 { 60 }
-fn default_true() -> bool { true }
+fn default_host() -> String {
+    "127.0.0.1".to_string()
+}
+fn default_port() -> u16 {
+    3000
+}
+fn default_log_level() -> String {
+    "info".to_string()
+}
+fn default_device() -> String {
+    "cuda".to_string()
+}
+fn default_max_concurrent() -> usize {
+    10
+}
+fn default_max_prompt_length() -> usize {
+    8192
+}
+fn default_max_response_tokens() -> usize {
+    2048
+}
+fn default_max_sessions() -> usize {
+    1000
+}
+fn default_session_ttl() -> u64 {
+    3600
+}
+fn default_rate_limit() -> u32 {
+    60
+}
+fn default_true() -> bool {
+    true
+}
 
 impl Default for Config {
     fn default() -> Self {
@@ -156,8 +178,7 @@ impl Config {
     pub fn from_file(path: &str) -> Result<Self> {
         let content = std::fs::read_to_string(path)
             .context(format!("Failed to read config file: {}", path))?;
-        let config: Config = toml::from_str(&content)
-            .context("Failed to parse config file")?;
+        let config: Config = toml::from_str(&content).context("Failed to parse config file")?;
         config.validate()?;
         Ok(config)
     }
@@ -181,7 +202,7 @@ impl Config {
         if self.server.port == 0 {
             anyhow::bail!("Server port cannot be 0");
         }
-        
+
         if self.models.available_models.is_empty() {
             anyhow::bail!("At least one model must be configured");
         }
@@ -195,10 +216,8 @@ impl Config {
 
     /// Save configuration to file
     pub fn save(&self, path: &str) -> Result<()> {
-        let content = toml::to_string_pretty(self)
-            .context("Failed to serialize config")?;
-        std::fs::write(path, content)
-            .context(format!("Failed to write config file: {}", path))?;
+        let content = toml::to_string_pretty(self).context("Failed to serialize config")?;
+        std::fs::write(path, content).context(format!("Failed to write config file: {}", path))?;
         Ok(())
     }
 }

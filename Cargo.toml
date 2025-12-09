@@ -1,10 +1,12 @@
 [package]
 name = "llm_inference"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 anyhow = "1"
+mistralrs = { git = "https://github.com/EricLBuehler/mistral.rs.git" }
+
 tokenizers = "0.22.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
@@ -27,6 +29,7 @@ metrics-exporter-prometheus = "0.12"
 chrono = { version = "0.4", features = ["serde"] }
 toml = "0.8"
 dashmap = "6.0"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
 
 [features]
 cuda = ["mistralrs/cuda"]

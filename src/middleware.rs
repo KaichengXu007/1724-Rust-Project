@@ -18,16 +18,19 @@ impl RateLimiter {
         let now = Instant::now();
         let window = Duration::from_secs(60);
 
-        let mut entry = self.requests.entry(key.to_string()).or_insert_with(Vec::new);
-        
+        let mut entry = self
+            .requests
+            .entry(key.to_string())
+            .or_insert_with(Vec::new);
+
         // Remove old entries
         entry.retain(|&time| now.duration_since(time) < window);
-        
+
         // Check limit
         if entry.len() >= limit as usize {
             return false;
         }
-        
+
         // Add current request
         entry.push(now);
         true
@@ -37,7 +40,7 @@ impl RateLimiter {
     pub fn cleanup(&self) {
         let now = Instant::now();
         let window = Duration::from_secs(60);
-        
+
         self.requests.retain(|_, times| {
             times.retain(|&time| now.duration_since(time) < window);
             !times.is_empty()
@@ -60,12 +63,12 @@ mod tests {
     #[test]
     fn test_rate_limiter() {
         let limiter = RateLimiter::new();
-        
+
         // Should allow up to limit
         assert!(limiter.check_rate_limit("test-key", 3));
         assert!(limiter.check_rate_limit("test-key", 3));
         assert!(limiter.check_rate_limit("test-key", 3));
-        
+
         // Should deny after limit
         assert!(!limiter.check_rate_limit("test-key", 3));
     }
@@ -73,10 +76,10 @@ mod tests {
     #[test]
     fn test_rate_limiter_different_keys() {
         let limiter = RateLimiter::new();
-        
+
         assert!(limiter.check_rate_limit("key1", 1));
         assert!(limiter.check_rate_limit("key2", 1));
-        
+
         // First key should be at limit
         assert!(!limiter.check_rate_limit("key1", 1));
         // Second key should still work

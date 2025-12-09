@@ -51,12 +51,24 @@ pub struct CompletionRequest {
     pub stream: bool,
 }
 
-fn default_max_token() -> usize { 128 }
-fn default_temperature() -> f64 { 0.7 }
-fn default_top_p() -> f64 { 0.95 }
-fn default_top_k() -> i32 { 10 }
-fn default_repeat_penalty() -> f32 { 1.0 }
-fn default_device() -> String { "cpu".to_string() }
+fn default_max_token() -> usize {
+    128
+}
+fn default_temperature() -> f64 {
+    0.7
+}
+fn default_top_p() -> f64 {
+    0.95
+}
+fn default_top_k() -> i32 {
+    10
+}
+fn default_repeat_penalty() -> f32 {
+    1.0
+}
+fn default_device() -> String {
+    "cpu".to_string()
+}
 
 /// 标准 API 返回的模型列表包装
 #[derive(Debug, Serialize, Deserialize)]
