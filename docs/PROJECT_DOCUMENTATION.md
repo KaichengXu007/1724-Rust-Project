@@ -711,6 +711,39 @@ Use provided Postman collection:
 # Run collection
 ```
 
+### Rate Limit Testing (PowerShell)
+
+To quickly validate the server-side rate limiting behavior from a Windows environment, a reusable PowerShell script is included at `scripts/test-rate-limit.ps1`.
+
+How it works:
+- The script issues repeated HTTP GET requests to the target URL (default `http://127.0.0.1:3000/sessions`).
+- It prints per-request status and, on 429 responses, prints the response body and all response headers (including `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`).
+
+Run the script (from the project root):
+```powershell
+cd "<project-root>"
+.\scripts\test-rate-limit.ps1
+```
+
+Examples with options:
+```powershell
+# target a different URL
+.\scripts\test-rate-limit.ps1 -Url 'http://127.0.0.1:3000/sessions' -Count 100 -DelayMs 50
+
+# quick smoke test with default args
+.\scripts\test-rate-limit.ps1
+```
+
+Interpreting output:
+- `ok N (200)` — request succeeded; the script will also print any `X-RateLimit-*` headers returned by the server.
+- `error N (429): {"error":"rate limit exceeded"}` — server rejected the request due to rate limiting; the following lines will list all response headers, including `X-RateLimit-Limit`, `X-RateLimit-Remaining` (usually `0`), and `X-RateLimit-Reset` (unix timestamp when window resets).
+
+Notes and tips:
+- If the default limit (60 requests/min) is too high for quick manual testing, temporarily lower `default_rate_limit_per_minute` in `config.toml` (for example to `3`), then restart the server.
+- WebSocket connections cannot expose upgrade response headers to browser JS; to test WS behavior use the frontend UI (which will show an alert on immediate WS close) or trigger many WS upgrades from the browser Console.
+- The script is intentionally conservative: it sleeps `DelayMs` between requests to avoid accidentally DoSing a real deployment; adjust as needed for local testing only.
+
+
 ---
 
 ## Monitoring

@@ -46,6 +46,27 @@ impl RateLimiter {
             !times.is_empty()
         });
     }
+
+    /// Return the remaining allowed requests for `key` under `limit` in the current window.
+    /// This does not modify internal state.
+    pub fn remaining(&self, key: &str, limit: u32) -> u32 {
+        let now = Instant::now();
+        let window = Duration::from_secs(60);
+
+        if let Some(times_ref) = self.requests.get(key) {
+            let cnt = times_ref
+                .iter()
+                .filter(|&&t| now.duration_since(t) < window)
+                .count();
+            if cnt >= limit as usize {
+                0
+            } else {
+                (limit as usize - cnt) as u32
+            }
+        } else {
+            limit
+        }
+    }
 }
 
 impl Clone for RateLimiter {

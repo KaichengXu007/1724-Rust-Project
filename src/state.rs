@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::engine::{InferenceEngine, TokenStream};
 use crate::models::{ChatMessage, InferenceRequest};
+use crate::middleware::RateLimiter;
 use anyhow::{anyhow, Result};
 use async_stream::stream;
 use futures_util::{FutureExt, StreamExt};
@@ -116,6 +117,7 @@ pub struct AppState {
     pub sessions: Arc<Mutex<HashMap<String, Vec<ChatMessage>>>>,
     pub metrics_handle: PrometheusHandle,
     pub config: Arc<Config>,
+    pub rate_limiter: Arc<RateLimiter>,
     session_store: Arc<SessionStore>,
 }
 
@@ -127,12 +129,14 @@ impl AppState {
     ) -> Result<Self> {
         let store = Arc::new(SessionStore::new(SESSIONS_DB).await?);
         let sessions = store.load_sessions().await.unwrap_or_default();
+        let rate_limiter = Arc::new(RateLimiter::new());
 
         Ok(Self {
             engine,
             sessions: Arc::new(Mutex::new(sessions)),
             metrics_handle,
             config: Arc::new(config),
+            rate_limiter,
             session_store: store,
         })
     }

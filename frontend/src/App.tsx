@@ -18,6 +18,13 @@ function App() {
     // Load sessions list
     api.getSessions().then((sessions) => {
       setSessions(sessions);
+    }).catch((err) => {
+      if ((err as any)?.status === 429 && (err as any)?.rateLimit) {
+        const rl = (err as any).rateLimit;
+        alert(`Rate limit exceeded. Remaining: ${rl.remaining ?? 'unknown'} / ${rl.limit ?? 'unknown'}`);
+      } else {
+        console.error('Failed to load sessions:', err);
+      }
     });
 
     // Ensure session ID is saved
@@ -36,7 +43,12 @@ function App() {
       const messages = history.filter((msg) => msg.role !== 'system');
       setMessages(messages as any);
     } catch (error) {
-      console.error('Failed to load history:', error);
+      if ((error as any)?.status === 429 && (error as any)?.rateLimit) {
+        const rl = (error as any).rateLimit;
+        alert(`Rate limit exceeded. Remaining: ${rl.remaining ?? 'unknown'} / ${rl.limit ?? 'unknown'}`);
+      } else {
+        console.error('Failed to load history:', error);
+      }
       setMessages([]);
     }
   };
@@ -56,7 +68,12 @@ function App() {
       const messages = history.filter((msg) => msg.role !== 'system');
       setMessages(messages as any);
     } catch (error) {
-      console.error('Failed to load history:', error);
+      if ((error as any)?.status === 429 && (error as any)?.rateLimit) {
+        const rl = (error as any).rateLimit;
+        alert(`Rate limit exceeded. Remaining: ${rl.remaining ?? 'unknown'} / ${rl.limit ?? 'unknown'}`);
+      } else {
+        console.error('Failed to load history:', error);
+      }
       setMessages([]);
     }
   };
@@ -93,7 +110,12 @@ function App() {
         }
       }
     } catch (error) {
-      console.error('Failed to delete session:', error);
+      if ((error as any)?.status === 429 && (error as any)?.rateLimit) {
+        const rl = (error as any).rateLimit;
+        alert(`Rate limit exceeded. Remaining: ${rl.remaining ?? 'unknown'} / ${rl.limit ?? 'unknown'}`);
+      } else {
+        console.error('Failed to delete session:', error);
+      }
     }
   };
 

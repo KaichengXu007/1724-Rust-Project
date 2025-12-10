@@ -102,6 +102,12 @@ export const useWebSocket = () => {
 
     ws.onclose = () => {
       setIsGenerating(false);
+      // If the connection closed immediately without producing tokens,
+      // it's likely an auth/rate-limit error on the server side.
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      if (tokenCountRef.current === 0 && elapsed < 3) {
+        alert('Connection closed by server. Possible rate limit or authorization failure.');
+      }
       wsRef.current = null;
     };
 

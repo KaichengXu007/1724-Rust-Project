@@ -76,8 +76,12 @@ async fn main() -> anyhow::Result<()> {
             .allow_methods(Any)
             .allow_headers(Any);
 
+        // Build router and attach rate-limit middleware (uses AppState clone)
         // Build router
+        // Attach global rate-limit middleware so all routes (including /sessions)
+        // receive X-RateLimit headers and 429 when exceeded.
         let app = routes::router()
+            .route_layer(axum::middleware::from_fn_with_state(state.clone(), routes::rate_limit))
             .with_state(state)
             .layer(cors)
             .fallback_service(ServeDir::new("frontend/dist"));

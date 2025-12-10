@@ -1,10 +1,30 @@
 const API_BASE = '';
 
+function parseRateLimitHeaders(headers: Headers) {
+  const limit = headers.get('x-ratelimit-limit');
+  const remaining = headers.get('x-ratelimit-remaining');
+  const reset = headers.get('x-ratelimit-reset');
+  return {
+    limit: limit ? Number(limit) : undefined,
+    remaining: remaining ? Number(remaining) : undefined,
+    reset: reset ? Number(reset) : undefined,
+  };
+}
+
 export const api = {
   // Sessions
   async getSessions(): Promise<string[]> {
     const res = await fetch(`${API_BASE}/sessions`);
-    if (!res.ok) throw new Error('Failed to fetch sessions');
+    if (!res.ok) {
+      if (res.status === 429) {
+        const rl = parseRateLimitHeaders(res.headers);
+        const err: any = new Error('Rate limit exceeded');
+        err.status = 429;
+        err.rateLimit = rl;
+        throw err;
+      }
+      throw new Error('Failed to fetch sessions');
+    }
     return res.json();
   },
 
@@ -18,7 +38,16 @@ export const api = {
   // History
   async getHistory(sessionId: string): Promise<Array<{ role: string; content: string }>> {
     const res = await fetch(`${API_BASE}/chat/history/${sessionId}`);
-    if (!res.ok) throw new Error('Failed to fetch history');
+    if (!res.ok) {
+      if (res.status === 429) {
+        const rl = parseRateLimitHeaders(res.headers);
+        const err: any = new Error('Rate limit exceeded');
+        err.status = 429;
+        err.rateLimit = rl;
+        throw err;
+      }
+      throw new Error('Failed to fetch history');
+    }
     return res.json();
   },
 
@@ -28,7 +57,16 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount }),
     });
-    if (!res.ok) throw new Error('Failed to rollback history');
+    if (!res.ok) {
+      if (res.status === 429) {
+        const rl = parseRateLimitHeaders(res.headers);
+        const err: any = new Error('Rate limit exceeded');
+        err.status = 429;
+        err.rateLimit = rl;
+        throw err;
+      }
+      throw new Error('Failed to rollback history');
+    }
   },
 
   // WebSocket

@@ -8,10 +8,16 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use axum::http::HeaderMap;
 use futures_util::StreamExt;
 use metrics::{counter, histogram, increment_counter};
 use std::convert::Infallible;
 use std::time::Instant;
+use axum::middleware::Next;
+use axum::http::{Request, StatusCode, HeaderValue};
+use hyper::Body;
+use serde_json::json;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_HISTORY_LENGTH: usize = 20; // Keep last 20 messages (approx 10 rounds)
 
@@ -31,6 +37,73 @@ pub fn router() -> Router<AppState> {
         .route("/health", get(health_check))
         .route("/readiness", get(readiness_check))
         .route("/metrics", get(metrics_handler))
+}
+
+// Rate limit middleware used by server to wrap the router. This middleware uses API key
+// when auth is enabled, otherwise falls back to an anonymous/ip-based key.
+pub async fn rate_limit(State(state): State<AppState>, req: Request<Body>, next: Next<Body>) -> axum::response::Response {
+    // extract api key
+    let auth_header = req.headers().get("authorization").and_then(|h| h.to_str().ok()).map(|s| s.to_string());
+
+    let key_for_limiter: String;
+    if state.config.security.enable_auth {
+        if let Some(hv) = auth_header {
+            if let Some(t) = hv.strip_prefix("Bearer ") {
+                key_for_limiter = t.to_string();
+            } else {
+                // invalid auth header
+                let body = Json(json!({"error": "Missing or invalid Authorization header"}));
+                return (StatusCode::UNAUTHORIZED, body).into_response();
+            }
+        } else {
+            let body = Json(json!({"error": "Authentication required"}));
+            return (StatusCode::UNAUTHORIZED, body).into_response();
+        }
+    } else {
+        // auth not required; use provided token if present, else fallback to X-Forwarded-For or 'anon'
+        if let Some(hv) = auth_header {
+            if let Some(t) = hv.strip_prefix("Bearer ") {
+                key_for_limiter = t.to_string();
+            } else {
+                key_for_limiter = hv;
+            }
+        } else if let Some(xff) = req.headers().get("x-forwarded-for").and_then(|h| h.to_str().ok()) {
+            key_for_limiter = format!("ip:{}", xff);
+        } else {
+            key_for_limiter = "anon".to_string();
+        }
+    }
+
+    // determine limit for this key
+    let mut limit = state.config.limits.default_rate_limit_per_minute;
+    if let Some(k) = state.config.security.api_keys.iter().find(|k| k.key == key_for_limiter) {
+        if let Some(l) = k.rate_limit_per_minute {
+            limit = l;
+        }
+    }
+
+    // check limit
+    let allowed = state.rate_limiter.check_rate_limit(&key_for_limiter, limit);
+    if allowed {
+        increment_counter!("rate_limit_allowed_total");
+        let mut resp = next.run(req).await;
+
+        // attach rate limit headers
+        let remaining = state.rate_limiter.remaining(&key_for_limiter, limit);
+        let reset_ts = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() + 60).unwrap_or(0);
+        resp.headers_mut().insert("X-RateLimit-Limit", HeaderValue::from_str(&limit.to_string()).unwrap());
+        resp.headers_mut().insert("X-RateLimit-Remaining", HeaderValue::from_str(&remaining.to_string()).unwrap());
+        resp.headers_mut().insert("X-RateLimit-Reset", HeaderValue::from_str(&reset_ts.to_string()).unwrap());
+        resp
+    } else {
+        increment_counter!("rate_limit_blocked_total");
+        let reset_ts = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() + 60).unwrap_or(0);
+        let mut res = (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": "rate limit exceeded"}))).into_response();
+        res.headers_mut().insert("X-RateLimit-Limit", HeaderValue::from_str(&limit.to_string()).unwrap());
+        res.headers_mut().insert("X-RateLimit-Remaining", HeaderValue::from_str("0").unwrap());
+        res.headers_mut().insert("X-RateLimit-Reset", HeaderValue::from_str(&reset_ts.to_string()).unwrap());
+        res
+    }
 }
 
 async fn health_check() -> impl IntoResponse {
@@ -184,10 +257,60 @@ async fn get_history(
 
 async fn completions(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<CompletionRequest>,
 ) -> axum::response::Response {
     increment_counter!("completions_requests_total");
     let start_time = Instant::now();
+
+    // Rate limiting: check API key or fallback
+    let auth_header = headers.get("authorization").and_then(|h| h.to_str().ok()).map(|s| s.to_string());
+    let key_for_limiter: String;
+    if state.config.security.enable_auth {
+        if let Some(hv) = auth_header {
+            if let Some(t) = hv.strip_prefix("Bearer ") {
+                key_for_limiter = t.to_string();
+            } else {
+                let body = Json(json!({"error": "Missing or invalid Authorization header"}));
+                return (StatusCode::UNAUTHORIZED, body).into_response();
+            }
+        } else {
+            let body = Json(json!({"error": "Authentication required"}));
+            return (StatusCode::UNAUTHORIZED, body).into_response();
+        }
+    } else {
+        if let Some(hv) = auth_header {
+            if let Some(t) = hv.strip_prefix("Bearer ") {
+                key_for_limiter = t.to_string();
+            } else {
+                key_for_limiter = hv;
+            }
+        } else if let Some(xff) = headers.get("x-forwarded-for").and_then(|h| h.to_str().ok()) {
+            key_for_limiter = format!("ip:{}", xff);
+        } else {
+            key_for_limiter = "anon".to_string();
+        }
+    }
+
+    let mut limit = state.config.limits.default_rate_limit_per_minute;
+    if let Some(k) = state.config.security.api_keys.iter().find(|k| k.key == key_for_limiter) {
+        if let Some(l) = k.rate_limit_per_minute {
+            limit = l;
+        }
+    }
+
+    let allowed = state.rate_limiter.check_rate_limit(&key_for_limiter, limit);
+    if !allowed {
+        increment_counter!("rate_limit_blocked_total");
+        let reset_ts = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() + 60).unwrap_or(0);
+        let mut res = (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": "rate limit exceeded"}))).into_response();
+        res.headers_mut().insert("X-RateLimit-Limit", HeaderValue::from_str(&limit.to_string()).unwrap());
+        res.headers_mut().insert("X-RateLimit-Remaining", HeaderValue::from_str("0").unwrap());
+        res.headers_mut().insert("X-RateLimit-Reset", HeaderValue::from_str(&reset_ts.to_string()).unwrap());
+        return res;
+    } else {
+        increment_counter!("rate_limit_allowed_total");
+    }
 
     // Validate prompt length
     if let Err(e) = state.validate_prompt_length(&req.prompt) {
@@ -311,10 +434,60 @@ async fn completions(
 
 async fn chat_completions(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(mut req): Json<InferenceRequest>,
 ) -> axum::response::Response {
     increment_counter!("chat_completions_requests_total");
     let start_time = Instant::now();
+
+    // Rate limiting (same logic as completions)
+    let auth_header = headers.get("authorization").and_then(|h| h.to_str().ok()).map(|s| s.to_string());
+    let key_for_limiter: String;
+    if state.config.security.enable_auth {
+        if let Some(hv) = auth_header {
+            if let Some(t) = hv.strip_prefix("Bearer ") {
+                key_for_limiter = t.to_string();
+            } else {
+                let body = Json(json!({"error": "Missing or invalid Authorization header"}));
+                return (StatusCode::UNAUTHORIZED, body).into_response();
+            }
+        } else {
+            let body = Json(json!({"error": "Authentication required"}));
+            return (StatusCode::UNAUTHORIZED, body).into_response();
+        }
+    } else {
+        if let Some(hv) = auth_header {
+            if let Some(t) = hv.strip_prefix("Bearer ") {
+                key_for_limiter = t.to_string();
+            } else {
+                key_for_limiter = hv;
+            }
+        } else if let Some(xff) = headers.get("x-forwarded-for").and_then(|h| h.to_str().ok()) {
+            key_for_limiter = format!("ip:{}", xff);
+        } else {
+            key_for_limiter = "anon".to_string();
+        }
+    }
+
+    let mut limit = state.config.limits.default_rate_limit_per_minute;
+    if let Some(k) = state.config.security.api_keys.iter().find(|k| k.key == key_for_limiter) {
+        if let Some(l) = k.rate_limit_per_minute {
+            limit = l;
+        }
+    }
+
+    let allowed = state.rate_limiter.check_rate_limit(&key_for_limiter, limit);
+    if !allowed {
+        increment_counter!("rate_limit_blocked_total");
+        let reset_ts = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() + 60).unwrap_or(0);
+        let mut res = (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": "rate limit exceeded"}))).into_response();
+        res.headers_mut().insert("X-RateLimit-Limit", HeaderValue::from_str(&limit.to_string()).unwrap());
+        res.headers_mut().insert("X-RateLimit-Remaining", HeaderValue::from_str("0").unwrap());
+        res.headers_mut().insert("X-RateLimit-Reset", HeaderValue::from_str(&reset_ts.to_string()).unwrap());
+        return res;
+    } else {
+        increment_counter!("rate_limit_allowed_total");
+    }
 
     // Validate prompt length
     if let Err(e) = state.validate_prompt_length(&req.prompt) {
@@ -451,7 +624,56 @@ async fn chat_completions(
     }
 }
 
-async fn chat_ws(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
+async fn chat_ws(ws: WebSocketUpgrade, headers: HeaderMap, State(state): State<AppState>) -> impl IntoResponse {
+    // Rate limiting before accepting websocket upgrade
+    let auth_header = headers.get("authorization").and_then(|h| h.to_str().ok()).map(|s| s.to_string());
+    let key_for_limiter: String;
+    if state.config.security.enable_auth {
+        if let Some(hv) = auth_header {
+            if let Some(t) = hv.strip_prefix("Bearer ") {
+                key_for_limiter = t.to_string();
+            } else {
+                let body = Json(json!({"error": "Missing or invalid Authorization header"}));
+                return (StatusCode::UNAUTHORIZED, body).into_response();
+            }
+        } else {
+            let body = Json(json!({"error": "Authentication required"}));
+            return (StatusCode::UNAUTHORIZED, body).into_response();
+        }
+    } else {
+        if let Some(hv) = auth_header {
+            if let Some(t) = hv.strip_prefix("Bearer ") {
+                key_for_limiter = t.to_string();
+            } else {
+                key_for_limiter = hv;
+            }
+        } else if let Some(xff) = headers.get("x-forwarded-for").and_then(|h| h.to_str().ok()) {
+            key_for_limiter = format!("ip:{}", xff);
+        } else {
+            key_for_limiter = "anon".to_string();
+        }
+    }
+
+    let mut limit = state.config.limits.default_rate_limit_per_minute;
+    if let Some(k) = state.config.security.api_keys.iter().find(|k| k.key == key_for_limiter) {
+        if let Some(l) = k.rate_limit_per_minute {
+            limit = l;
+        }
+    }
+
+    let allowed = state.rate_limiter.check_rate_limit(&key_for_limiter, limit);
+    if !allowed {
+        increment_counter!("rate_limit_blocked_total");
+        let reset_ts = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() + 60).unwrap_or(0);
+        let mut res = (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": "rate limit exceeded"}))).into_response();
+        res.headers_mut().insert("X-RateLimit-Limit", HeaderValue::from_str(&limit.to_string()).unwrap());
+        res.headers_mut().insert("X-RateLimit-Remaining", HeaderValue::from_str("0").unwrap());
+        res.headers_mut().insert("X-RateLimit-Reset", HeaderValue::from_str(&reset_ts.to_string()).unwrap());
+        return res;
+    } else {
+        increment_counter!("rate_limit_allowed_total");
+    }
+
     ws.on_upgrade(|socket| handle_socket(socket, state))
 }
 
