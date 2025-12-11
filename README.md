@@ -6,6 +6,36 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
 [![React](https://img.shields.io/badge/react-19.2.0-blue.svg)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.x-blue.svg)](https://www.typescriptlang.org/)
 
+## 💡 Motivation
+
+The landscape of LLM inference is dominated by Python-based solutions, which often struggle with performance, memory efficiency, and deployment complexity. We wanted to explore whether Rust—with its zero-cost abstractions, memory safety guarantees, and exceptional performance—could provide a superior foundation for production LLM serving.
+
+This project fills a critical gap in the Rust ecosystem by providing:
+- **Production-grade LLM serving** with session persistence and stateful conversations
+- **True streaming inference** with WebSocket support for real-time token delivery
+- **Enterprise-ready features** like rate limiting, metrics, and health checks
+- **Modern web UI** that rivals commercial LLM interfaces
+
+Our motivation was to prove that Rust can compete with established Python frameworks while offering better resource utilization, faster inference, and more reliable deployments—making LLMs accessible even on resource-constrained environments.
+
+## 🎯 Objectives
+
+This project aims to achieve the following objectives:
+
+1. **High-Performance Inference**: Leverage Rust's performance characteristics and Candle ML framework to deliver low-latency LLM inference with efficient memory usage
+
+2. **Production-Ready Architecture**: Build a complete inference service with session management, persistence, rate limiting, and observability—not just a proof of concept
+
+3. **Developer Experience**: Provide OpenAI-compatible APIs and comprehensive documentation to enable easy integration and deployment
+
+4. **Modern UI/UX**: Create an intuitive React-based interface with real-time streaming, markdown rendering, and session management that matches commercial LLM platforms
+
+5. **Deployment Flexibility**: Support multiple hardware configurations (CPU, CUDA, Metal) and provide a single-binary deployment with minimal dependencies
+
+6. **Ecosystem Contribution**: Demonstrate Rust's viability for ML workloads and contribute to the growing Rust ML ecosystem through practical, documented examples
+
+---
+
 ## ✨ Features
 
 ### 🎯 Core Capabilities

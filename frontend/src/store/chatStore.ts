@@ -43,6 +43,8 @@ interface ChatState {
   setTokenCount: (count: number) => void;
   setTokensPerSecond: (tps: number) => void;
   clearMessages: () => void;
+  saveSessionSettings: (sessionId: string, settings: ChatSettings) => void;
+  loadSessionSettings: (sessionId: string) => ChatSettings | null;
 }
 
 const defaultSettings: ChatSettings = {
@@ -98,11 +100,37 @@ export const useChatStore = create<ChatState>((set) => ({
   
   updateSessionTitle: () => {}, // No-op for compatibility
   
-  removeSession: (id) => set((state) => ({ sessions: state.sessions.filter(s => s !== id) })),
+  removeSession: (id) => set((state) => {
+    // Also remove session metadata from localStorage
+    try {
+      const metadata = localStorage.getItem('rust_llm_session_metadata');
+      if (metadata) {
+        const parsed = JSON.parse(metadata);
+        delete parsed[id];
+        localStorage.setItem('rust_llm_session_metadata', JSON.stringify(parsed));
+      }
+    } catch (e) {
+      console.error('Failed to remove session metadata:', e);
+    }
+    return { sessions: state.sessions.filter(s => s !== id) };
+  }),
 
-  updateSettings: (newSettings) => set((state) => ({
-    settings: { ...state.settings, ...newSettings },
-  })),
+  updateSettings: (newSettings) => set((state) => {
+    const updated = { ...state.settings, ...newSettings };
+    // Save settings for current session
+    try {
+      const metadata = localStorage.getItem('rust_llm_session_metadata');
+      const parsed = metadata ? JSON.parse(metadata) : {};
+      parsed[state.sessionId] = {
+        settings: updated,
+        lastUsed: Date.now(),
+      };
+      localStorage.setItem('rust_llm_session_metadata', JSON.stringify(parsed));
+    } catch (e) {
+      console.error('Failed to save session metadata:', e);
+    }
+    return { settings: updated };
+  }),
 
   resetSettings: () => set({ settings: defaultSettings }),
 
@@ -115,4 +143,34 @@ export const useChatStore = create<ChatState>((set) => ({
   setTokensPerSecond: (tps) => set({ tokensPerSecond: tps }),
 
   clearMessages: () => set({ messages: [] }),
+
+  saveSessionSettings: (sessionId: string, settings: ChatSettings) => {
+    try {
+      const metadata = localStorage.getItem('rust_llm_session_metadata');
+      const parsed = metadata ? JSON.parse(metadata) : {};
+      parsed[sessionId] = {
+        settings,
+        lastUsed: Date.now(),
+      };
+      localStorage.setItem('rust_llm_session_metadata', JSON.stringify(parsed));
+    } catch (e) {
+      console.error('Failed to save session settings:', e);
+    }
+  },
+
+  loadSessionSettings: (sessionId: string): ChatSettings | null => {
+    try {
+      const metadata = localStorage.getItem('rust_llm_session_metadata');
+      if (metadata) {
+        const parsed = JSON.parse(metadata);
+        const sessionData = parsed[sessionId];
+        if (sessionData && sessionData.settings) {
+          return sessionData.settings;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load session settings:', e);
+    }
+    return null;
+  },
 }));

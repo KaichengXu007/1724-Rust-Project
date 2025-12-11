@@ -11,7 +11,11 @@ function App() {
     setMessages, 
     setSessions, 
     addSession,
-    clearMessages
+    clearMessages,
+    saveSessionSettings,
+    loadSessionSettings,
+    updateSettings,
+    settings
   } = useChatStore();
 
   useEffect(() => {
@@ -56,13 +60,27 @@ function App() {
   const handleNewChat = () => {
     const newId = crypto.randomUUID();
     console.log('Creating new chat with ID:', newId);
+    // Save current session settings before switching
+    saveSessionSettings(sessionId, settings);
     setSessionId(newId);
     addSession(newId);
     clearMessages();
+    // New session uses current settings (user can change if needed)
   };
 
   const handleSwitchSession = async (id: string) => {
+    // Save current session settings before switching
+    saveSessionSettings(sessionId, settings);
+    
     setSessionId(id);
+    
+    // Load settings for the new session
+    const sessionSettings = loadSessionSettings(id);
+    if (sessionSettings) {
+      console.log('Loading saved settings for session:', id, sessionSettings);
+      updateSettings(sessionSettings);
+    }
+    
     try {
       const history = await api.getHistory(id);
       const messages = history.filter((msg) => msg.role !== 'system');
