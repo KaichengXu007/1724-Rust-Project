@@ -6,6 +6,13 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
 [![React](https://img.shields.io/badge/react-19.2.0-blue.svg)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.x-blue.svg)](https://www.typescriptlang.org/)
 
+## Video Slide Presentation
+
+## Video Demo
+
+## Contribution
+- **Zhiwen Yang** zhiwen.yang@mail.utoronto.ca
+
 ## 💡 Motivation
 
 The landscape of LLM inference is dominated by Python-based solutions, which often struggle with performance, memory efficiency, and deployment complexity. We wanted to explore whether Rust—with its zero-cost abstractions, memory safety guarantees, and exceptional performance—could provide a superior foundation for production LLM serving.
