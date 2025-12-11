@@ -28,11 +28,11 @@ The Rust LLM Inference Service is a high-performance, production-ready server fo
 - 🚀 **GPU Accelerated**: CUDA support for NVIDIA GPUs (10-50x faster than CPU)
 - ⚛️ **Modern React UI**: TypeScript + Vite + Tailwind CSS + Zustand
 - 🔄 **Real-time Streaming**: WebSocket streaming with live token generation
-- 💬 **Session Management**: Multi-session support with persistent conversation history
+- 💬 **Session Management**: Multi-session support with SQLite-backed persistent storage
 - 🔒 **Enterprise Security**: API key authentication, rate limiting, content validation
 - 📊 **Observability**: Prometheus metrics, health checks, structured logging
-- 🐳 **Cloud Native**: Docker containers with GPU support
 - 🎨 **Rich UI Features**: Markdown rendering, syntax highlighting, export history
+- 🗄️ **Data Persistence**: SQLite database for session and conversation history
 
 ---
 
@@ -109,12 +109,39 @@ The Rust LLM Inference Service is a high-performance, production-ready server fo
   - System prompts
   - Stop sequences
 
+**WebSocket Protocol**:
+```javascript
+// Connect with session ID in query params
+const ws = new WebSocket('ws://localhost:3000/chat/ws?session_id=my-session');
+
+// Send request (JSON)
+ws.send(JSON.stringify({
+  model_name: "qwen",
+  prompt: "Your question here",
+  temperature: 0.7,
+  max_token: 256,
+  device: "cuda"
+}));
+
+// Receive tokens (one per message)
+ws.onmessage = (event) => {
+  console.log('Token:', event.data); // Plain text, not JSON
+};
+```
+
 #### 3. Session Management
 - **Multi-Session**: Independent conversation threads with UUIDs
 - **Persistent Storage**: History saved to SQLite (`sessions.db`)
 - **Auto-Trimming**: Keep last 20 messages to prevent context overflow
 - **History API**: Query and manage conversation history via REST
 - **Session CRUD**: Create, read, update, delete operations
+- **Rollback Support**: Remove last N messages from conversation
+
+**Session API Endpoints**:
+- `GET /sessions` - List all session IDs
+- `GET /chat/history/:session_id` - Get conversation history
+- `DELETE /chat/history/:session_id` - Delete session
+- `POST /chat/history/:session_id/rollback` - Rollback N messages (body: `{"amount": 2}`)
 #### 4. Security & Governance
 - **API Key Authentication**: Bearer token support
 - **Rate Limiting**: Per-key or per-IP request throttling
@@ -134,8 +161,6 @@ The Rust LLM Inference Service is a high-performance, production-ready server fo
   - Session statistics
 
 #### 6. Deployment
-- **Docker Support**: Multi-stage builds for CPU and GPU
-- **Docker Compose**: Integrated stack with Prometheus and Grafana
 - **Health Probes**: Container-level health checking
 - **Volume Mounts**: Persistent models and data
 - **Environment Config**: Override settings via env vars
@@ -150,7 +175,6 @@ The Rust LLM Inference Service is a high-performance, production-ready server fo
 - **Node.js**: 18+ and npm ([Install Node.js](https://nodejs.org/))
 - **Git**: For cloning repository
 - **(Optional)** NVIDIA GPU with CUDA 12.1+ for GPU acceleration
-- **(Optional)** Docker for containerized deployment
 
 ### Quick Start
 
@@ -191,23 +215,6 @@ npm run dev
 # Frontend will be available at http://localhost:5173
 ```
 
-#### Option 3: Docker
-
-```bash
-# Clone repository
-git clone https://github.com/KaichengXu007/1724-Rust-Project.git
-cd 1724-Rust-Project
-
-# Run with GPU
-docker-compose -f docker/docker-compose.yml up llm-gpu
-
-# OR run with CPU
-docker-compose -f docker/docker-compose.yml up llm-cpu
-
-# Open browser
-# Navigate to http://localhost:3000
-```
-
 The service will:
 - Start on port 3000
 - Serve the React frontend from `frontend/dist/`
@@ -237,38 +244,49 @@ Create `config.toml` (optional - defaults work out of the box):
 
 ```toml
 [server]
-host = "0.0.0.0"
+host = "127.0.0.1"
 port = 3000
 log_level = "info"  # trace, debug, info, warn, error
 
 [models]
-# Available models
-models = [
-    "Qwen/Qwen2.5-0.5B-Instruct",
-    "microsoft/Phi-3.5-mini-instruct"
-]
 default_device = "cuda"  # cuda, cpu, metal
-default_quantization = "bf16"
+max_concurrent_requests = 10
+
+# Available models configuration
+[[models.available_models]]
+id = "qwen"
+name = "Qwen/Qwen2.5-0.5B-Instruct"
+context_length = 4096
+# path = "/path/to/local/model"  # Optional: local model path
+# quantization = "q4"  # Optional: q4, q8, bf16
+
+[[models.available_models]]
+id = "phi"
+name = "microsoft/Phi-3.5-mini-instruct"
+context_length = 4096
 
 [security]
-enable_auth = false
-api_keys = [
-    { key = "sk-your-key-here", rate_limit = 100, enabled = true }
-]
-enable_cors = true
-cors_origins = ["*"]
+enable_auth = false  # Set to true to require API keys
+allowed_origins = ["*"]  # CORS configuration
+
+# API Keys - only used if enable_auth = true
+# [[security.api_keys]]
+# key = "sk-your-secret-key-here"
+# name = "default"
+# rate_limit_per_minute = 100
+# enabled = true
 
 [limits]
 max_prompt_length = 8192
 max_response_tokens = 2048
 max_sessions = 1000
-session_ttl_seconds = 86400  # 24 hours
-default_rate_limit = 60
+session_ttl_seconds = 3600  # 1 hour
+default_rate_limit_per_minute = 60
 
 [observability]
 enable_metrics = true
+enable_tracing = true
 metrics_path = "/metrics"
-enable_tracing = false
 ```
 
 ### Environment Variables
@@ -412,9 +430,10 @@ App.tsx (Root Component)
 │  POST /completions  → Generate completion                   │
 │  WS /chat/ws        → Real-time streaming                   │
 │  DELETE /chat/history/:id → Delete session                  │
+│  POST /chat/history/:id/rollback → Rollback messages        │
 ├─────────────────────────────────────────────────────────────┤
-│                Application State (Arc<RwLock>)              │
-│         Session Manager • Model Cache • Rate Limiters        │
+│         Application State (Arc + Mutex + SQLite)            │
+│  Session Manager • Model Cache • Rate Limiters • SQLite DB   │
 ├─────────────────────────────────────────────────────────────┤
 │              M1 Engine Adapter (mistral.rs)                 │
 │         Model Loader • Tokenization • Sampling              │
@@ -450,7 +469,8 @@ App.tsx (Root Component)
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  Arc<AppState>                                       │  │
 │  │    • M1EngineAdapter (Thread-safe model cache)       │  │
-│  │    • SessionStore (Arc<Mutex<HashMap>>)              │  │
+│  │    • SessionStore (SQLite + In-memory cache)         │  │
+│  │    • RateLimiter (DashMap per-key tracking)          │  │
 │  │    • Config                                          │  │
 │  │    • Metrics Registry                                │  │
 │  └──────────────────────────────────────────────────────┘  │
@@ -530,111 +550,107 @@ cargo run --release --bin server
 cargo run --release --features cuda --bin server
 ```
 
-### Docker Production
+### Production Deployment
 
-**Build Images**:
+**Build for Production**:
 ```bash
-# CPU version
-docker build -t llm-service:cpu -f docker/Dockerfile .
+# Build frontend
+cd frontend
+npm install
+npm run build
+cd ..
 
-# GPU version
-docker build -t llm-service:gpu -f docker/Dockerfile.cuda .
+# Build backend with optimizations
+cargo build --release --features cuda
+
+# Binary will be at: target/release/server
 ```
 
-**Run Containers**:
-```bash
-# CPU
-docker run -p 3000:3000 \
-  -v $(pwd)/models:/app/models \
-  -v $(pwd)/sessions.db:/app/sessions.db \
-  llm-service:cpu
+**Run as Service (Linux with systemd)**:
 
-# GPU
-docker run --gpus all -p 3000:3000 \
-  -v $(pwd)/models:/app/models \
-  -v $(pwd)/sessions.db:/app/sessions.db \
-  llm-service:gpu
+Create `/etc/systemd/system/llm-inference.service`:
+```ini
+[Unit]
+Description=LLM Inference Service
+After=network.target
+
+[Service]
+Type=simple
+User=llm
+WorkingDirectory=/opt/llm-inference
+ExecStart=/opt/llm-inference/target/release/server
+Restart=always
+RestartSec=10
+Environment="RUST_LOG=info"
+Environment="CUDA_VISIBLE_DEVICES=0"
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-### Docker Compose Stack
-
-```bash
-# Start full stack (app + Prometheus + Grafana)
-docker-compose -f docker/docker-compose.yml up -d
-
-# View logs
-docker-compose -f docker/docker-compose.yml logs -f llm-gpu
-
-# Stop stack
-docker-compose -f docker/docker-compose.yml down
-```
-
-**Services**:
-- LLM Service: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3001` (admin/admin)
-
-### WSL2 with CUDA
-
-For Windows users with NVIDIA GPUs:
-
-```bash
-# Enter WSL
-wsl
-
-# Navigate to project
-cd /mnt/c/Users/YourName/path/to/project
-
-# Build with CUDA
-bash scripts/build_cuda_wsl.sh
-
-# Run
-./target/release/server
-```
-
-See `scripts/WSL_SETUP.md` for complete WSL setup guide.
-
----
+**Data Persistence**:
+- Sessions: `sessions.db` (SQLite database)
+- Models: Cached in `~/.cache/huggingface/` by default
+- Logs: Captured by systemd journal (`journalctl -u llm-inference -f`)
 
 ## Development
 
 ### Project Structure
 
 ```
-rust-llm-inference/
-├── src/
+1724-Rust-Project/
+├── frontend/                   # React frontend
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── ChatContainer.tsx  # Main chat UI
+│   │   │   ├── Message.tsx        # Message rendering
+│   │   │   └── Sidebar.tsx        # Session & settings
+│   │   ├── hooks/
+│   │   │   └── useWebSocket.ts    # WebSocket streaming
+│   │   ├── services/
+│   │   │   └── api.ts             # API client
+│   │   ├── store/
+│   │   │   └── chatStore.ts       # Zustand state
+│   │   ├── assets/             # Static assets
+│   │   ├── App.tsx             # Root component
+│   │   ├── App.css             # Component styles
+│   │   ├── index.css           # Global Tailwind styles
+│   │   └── main.tsx            # React entry point
+│   ├── public/
+│   │   └── index.html          # HTML template
+│   ├── dist/                   # Production build (generated)
+│   ├── package.json            # NPM dependencies
+│   ├── tsconfig.json           # TypeScript config
+│   ├── tailwind.config.js      # Tailwind CSS config
+│   └── vite.config.ts          # Vite build config
+├── src/                        # Rust backend
 │   ├── bin/
-│   │   └── server.rs          # Binary entry point
-│   ├── engine.rs              # Inference engine
-│   ├── engine_mock.rs         # Mock for testing
-│   ├── routes.rs              # API endpoints
-│   ├── state.rs               # Application state
-│   ├── models.rs              # Request/response models
-│   └── lib.rs                 # Library exports
+│   │   └── server.rs           # Entry point with pre-warming
+│   ├── config.rs               # TOML configuration loader
+│   ├── engine.rs               # Inference engine adapter
+│   ├── engine_mock.rs          # Mock engine for testing
+│   ├── lib.rs                  # Library root
+│   ├── middleware.rs           # Rate limiter implementation
+│   ├── models.rs               # Request/response data models
+│   ├── routes.rs               # HTTP/WebSocket handlers
+│   └── state.rs                # App state & SQLite session store
 ├── tests/
-│   ├── integration_tests.rs   # API tests
-│   ├── config_tests.rs        # Config tests
-│   └── middleware_tests.rs    # Middleware tests
-├── public/
-│   └── index.html             # Web UI
+│   ├── integration_tests.rs    # API integration tests
+│   ├── config_tests.rs         # Config validation tests
+│   └── middleware_tests.rs     # Rate limiter tests
 ├── docs/
-│   ├── API_REFERENCE.md       # API documentation
-│   └── PROJECT_DOCUMENTATION.md # This file
-├── docker/
-│   ├── Dockerfile             # CPU image
-│   ├── Dockerfile.cuda        # GPU image
-│   ├── docker-compose.yml     # Docker stack
-│   ├── prometheus.yml         # Metrics config
-│   ├── .dockerignore          # Build optimization
-│   └── README.md              # Docker guide
+│   ├── API_REFERENCE.md        # API documentation
+│   ├── PROJECT_DOCUMENTATION.md # Complete technical guide
+│   └── PROJECT_PROPOSAL.md     # Original project proposal
 ├── scripts/
-│   ├── build_cuda_wsl.sh      # CUDA build script
-│   ├── build_cpu_wsl.sh       # CPU build script
-│   └── upgrade_cuda_wsl.sh    # CUDA upgrade script
-├── Cargo.toml                 # Dependencies
-├── config.example.toml        # Example config
-├── postman_collection.json    # API tests
-└── README.md                  # Quick start
+│   └── test-rate-limit.ps1     # Rate limiting test script
+├── Cargo.toml                  # Rust dependencies & features
+├── config.toml                 # Runtime configuration
+├── config.example.toml         # Configuration template
+├── sessions.db                 # SQLite session database
+├── postman_collection.json     # Postman API tests
+├── CODE_ANALYSIS.md            # Comprehensive code analysis
+└── README.md                   # Quick start guide
 ```
 
 ### Adding a New Endpoint
@@ -688,9 +704,6 @@ cargo test
 
 # With output
 cargo test -- --nocapture
-
-# Specific test
-cargo test test_completions_endpoint
 
 # Integration tests only
 cargo test --test integration_tests
@@ -752,22 +765,28 @@ Notes and tips:
 
 Access metrics at `http://localhost:3000/metrics`
 
-**Key Metrics**:
-- `health_check_requests_total`
-- `completions_requests_total`
-- `chat_completions_requests_total`
-- `completions_duration_seconds` (histogram)
-- `completions_tokens_total`
-- `chat_generated_tokens_total`
-- `completions_errors_total`
+**Available Metrics**:
+- `chat_completions_requests_total`: Chat completion request count
+- `chat_inference_duration_seconds`: Inference latency histogram
+- `chat_generated_tokens_total`: Total tokens generated in chat
+- `completions_errors_total`: Completion errors
+- `chat_completions_errors_total`: Chat completion errors
+- `rate_limit_allowed_total`: Requests allowed by rate limiter
+- `rate_limit_blocked_total`: Requests blocked by rate limiter
+- `health_check_requests_total`: Health check endpoint calls
+- `readiness_check_requests_total`: Readiness check endpoint calls
+- `models_list_requests_total`: Model list requests
+- `model_info_requests_total`: Model info requests
+- `history_requests_total`: Session history requests
 
 ### Grafana Dashboards
 
-1. Start stack: `docker-compose up -d`
-2. Open Grafana: `http://localhost:3001`
-3. Login: `admin` / `admin`
-4. Add Prometheus datasource: `http://prometheus:9090`
-5. Import dashboard or create custom
+To set up monitoring with Grafana:
+
+1. Install Prometheus and Grafana on your system
+2. Configure Prometheus to scrape `http://localhost:3000/metrics`
+3. Add Prometheus as datasource in Grafana
+4. Create custom dashboards or import community templates
 
 **Useful Queries**:
 ```promql
@@ -851,6 +870,53 @@ lsof -ti:3000 | xargs kill -9
 - Reduce `max_tokens`
 - Close other GPU applications
 
+#### 6. Database Locked
+**Symptom**: `database is locked` or SQLite errors
+
+**Solution**:
+```bash
+# Stop all running instances
+# Windows PowerShell
+Get-Process | Where-Object {$_.ProcessName -like "*server*"} | Stop-Process
+
+# Linux/macOS
+pkill -f server
+
+# If corrupted, remove lock files
+rm sessions.db-wal sessions.db-shm
+```
+
+#### 7. Frontend Build Errors
+**Symptom**: `npm run build` fails
+
+**Solution**:
+```bash
+cd frontend
+rm -rf node_modules package-lock.json
+npm cache clean --force
+npm install
+npm run build
+```
+
+#### 8. Session Not Persisting
+**Symptom**: Sessions lost after restart
+
+**Solution**:
+- Check `sessions.db` exists in working directory
+- Verify SQLite permissions (read/write)
+- Check disk space
+- Review logs for database errors
+
+#### 9. WebSocket Connection Failed
+**Symptom**: Chat doesn't stream, connection errors
+
+**Solution**:
+- Check backend is running (`http://localhost:3000/health`)
+- Verify port 3000 is accessible
+- Check browser console for errors
+- Ensure no proxy/firewall blocking WebSocket
+- Try refreshing the page
+
 ### Debug Mode
 
 ```bash
@@ -872,5 +938,3 @@ For additional help:
 - Check metrics: `curl http://localhost:3000/metrics`
 
 ---
-
-*Last Updated: 2025-12-07*

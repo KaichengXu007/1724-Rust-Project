@@ -5,15 +5,17 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/react-19.2.0-blue.svg)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.x-blue.svg)](https://www.typescriptlang.org/)
-[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docker/)
 
 ## ✨ Features
 
 ### 🎯 Core Capabilities
 - **Multiple Model Support**: Load and manage multiple Huggingface-format models via Candle and Mistral.rs
 - **Streaming Inference**: Real-time token streaming via WebSocket with tokens/second display
+- **Model Pre-warming**: Automatic model loading at startup for zero-latency first requests
 - **Session Management**: Stateful conversations with full history and session switching
   - SQLite-backed persistence with per-session durability
+  - Automatic context pruning (maintains last 20 messages)
+  - Session rollback support for conversation editing
 - **Modern React UI**: 
   - Built with React 19 + TypeScript + Vite
   - Zustand state management
@@ -24,7 +26,6 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
   - Advanced model settings panel
 
 ### 🔒 Security & Governance
-- **API Key Authentication**: Optional token-based authentication
 - **Rate Limiting**: Per-key and IP-based rate limiting
 - **Content Validation**: Configurable prompt/response length guards
 - **CORS Support**: Cross-origin resource sharing configuration
@@ -37,8 +38,6 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
 
 ### 🚢 Deployment
 - **Single Binary**: Portable executable with zero runtime dependencies
-- **Docker Support**: Multi-stage builds for CPU and CUDA
-- **Docker Compose**: Ready-to-use orchestration with Prometheus/Grafana
 - **Configuration**: TOML-based config with sensible defaults
 
 ### 🔌 API Compatibility
@@ -64,8 +63,8 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
 ├─────────────────────────────────────────────────────────────┤
 │  Authentication  │  Rate Limiting  │  Content Validation    │
 ├─────────────────────────────────────────────────────────────┤
-│               Session Manager (HashMap + Mutex)             │
-│             Conversation History • Context Pruning           │
+│        Session Manager (HashMap + Mutex + SQLite)           │
+│   In-memory Cache • Persistent Storage • Context Pruning    │
 ├─────────────────────────────────────────────────────────────┤
 │              M1 Engine Adapter (mistral.rs)                 │
 │         Model Loader • Tokenization • Sampling              │
@@ -98,7 +97,6 @@ A high-performance, production-ready Large Language Model (LLM) inference servic
 - **Rust** 1.75+ (`rustup` recommended)
 - **Node.js** 18+ and npm (for frontend development)
 - **(Optional)** NVIDIA GPU + CUDA Toolkit 12.1+ for GPU acceleration
-- **(Optional)** Docker for containerized deployment
 
 ### Installation
 
@@ -192,6 +190,21 @@ default_rate_limit_per_minute = 60
 
 See [API Reference](docs/API_REFERENCE.md) for comprehensive documentation.
 
+### Available Endpoints
+
+- `GET /models` - List all available models
+- `GET /models/:model_id` - Get specific model information
+- `GET /sessions` - List all session IDs
+- `POST /completions` - Generate text completion
+- `POST /chat/completions` - Chat completion (with streaming)
+- `GET /chat/ws` - WebSocket endpoint for real-time streaming
+- `GET /chat/history/:session_id` - Get session conversation history
+- `DELETE /chat/history/:session_id` - Delete a session
+- `POST /chat/history/:session_id/rollback` - Rollback N messages from history
+- `GET /health` - Health check endpoint
+- `GET /readiness` - Readiness check (validates model availability)
+- `GET /metrics` - Prometheus metrics
+
 ### Examples
 
 **List models**:
@@ -215,11 +228,31 @@ curl -X POST http://localhost:3000/completions \
 curl -X POST http://localhost:3000/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model-name": "Qwen/Qwen2.5-0.5B-Instruct",
+    "model_name": "qwen",
     "prompt": "What is async/await?",
-    "max-token": 256,
+    "max_token": 256,
+    "temperature": 0.7,
     "device": "cuda"
   }'
+```
+
+**WebSocket chat** (real-time streaming):
+```javascript
+const ws = new WebSocket('ws://localhost:3000/chat/ws?session_id=my-session');
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    model_name: "qwen",
+    prompt: "Explain Rust ownership",
+    temperature: 0.7,
+    max_token: 256,
+    device: "cuda"
+  }));
+};
+
+ws.onmessage = (event) => {
+  console.log('Token:', event.data); // Receives tokens one by one
+};
 ```
 
 ---
@@ -231,6 +264,22 @@ Run the test suite:
 ```bash
 # All tests
 cargo test
+
+# Specific test suites
+cargo test --test integration_tests  # Integration tests
+cargo test --test config_tests       # Config validation tests
+cargo test --test middleware_tests   # Middleware tests
+cargo test --lib                     # Unit tests only
+
+# With verbose output
+RUST_LOG=debug cargo test -- --nocapture
+```
+
+### Frontend Tests
+
+```bash
+cd frontend
+npm run test  # (when implemented)
 ```
 
 ---
@@ -242,10 +291,18 @@ cargo test
 Access metrics at `http://localhost:3000/metrics`
 
 **Key Metrics**:
-- `chat_completions_requests_total`: Request count
-- `chat_inference_duration_seconds`: Inference latency
-- `chat_generated_tokens_total`: Token throughput
-- `completions_errors_total`: Error rate
+- `chat_completions_requests_total`: Chat completion request count
+- `chat_inference_duration_seconds`: Inference latency histogram
+- `chat_generated_tokens_total`: Total tokens generated
+- `completions_errors_total`: Completion errors
+- `chat_completions_errors_total`: Chat completion errors
+- `rate_limit_allowed_total`: Requests allowed by rate limiter
+- `rate_limit_blocked_total`: Requests blocked by rate limiter
+- `health_check_requests_total`: Health check endpoint calls
+- `readiness_check_requests_total`: Readiness check endpoint calls
+- `models_list_requests_total`: Model list requests
+- `model_info_requests_total`: Model info requests
+- `history_requests_total`: Session history requests
 
 ### Health Checks
 
@@ -266,58 +323,131 @@ curl http://localhost:3000/readiness
 
 ---
 
+## 🔧 Troubleshooting
+
+### Model Download Issues
+
+Models are automatically downloaded from HuggingFace. If downloads fail:
+
+1. **For gated models**, set your HuggingFace token:
+```bash
+export HF_TOKEN="your_token_here"
+```
+
+2. **For network issues**, download manually:
+```bash
+git lfs install
+git clone https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
+```
+
+3. **Use local path** in `config.toml`:
+```toml
+[[models.available_models]]
+id = "qwen"
+path = "./Qwen2.5-0.5B-Instruct"
+```
+
+### CUDA Build Errors
+
+If `cargo build --features cuda` fails:
+
+1. **Verify CUDA installation**:
+```bash
+nvcc --version
+nvidia-smi
+```
+
+2. **Install CUDA Toolkit 12.1+**: [CUDA Downloads](https://developer.nvidia.com/cuda-downloads)
+
+3. **Set environment variables** (Linux/macOS):
+```bash
+export CUDA_HOME=/usr/local/cuda
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+```
+
+### Port Conflicts
+
+If port 3000 is in use, change it in `config.toml`:
+```toml
+[server]
+port = 8080
+```
+
+### Database Locked Errors
+
+1. Stop all running instances:
+```bash
+# Linux/macOS
+pkill -f server
+
+# Windows PowerShell
+Get-Process | Where-Object {$_.ProcessName -like "*server*"} | Stop-Process
+```
+
+2. If corrupted, remove lock files:
+```bash
+rm sessions.db-wal sessions.db-shm
+```
+
+---
+
 ## 🛠️ Development
 
 ### Project Structure
 
 ```
 .
-├── frontend/                   # React frontend
+├── frontend/                       # React frontend
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── ChatContainer.tsx  # Main chat UI
-│   │   │   ├── Message.tsx        # Message rendering
-│   │   │   └── Sidebar.tsx        # Session & settings
+│   │   │   ├── ChatContainer.tsx   # Main chat UI
+│   │   │   ├── Message.tsx         # Message rendering
+│   │   │   └── Sidebar.tsx         # Session & settings
 │   │   ├── hooks/
-│   │   │   └── useWebSocket.ts    # WebSocket streaming
+│   │   │   └── useWebSocket.ts     # WebSocket streaming
 │   │   ├── services/
-│   │   │   └── api.ts             # API client
+│   │   │   └── api.ts              # API client
 │   │   ├── store/
-│   │   │   └── chatStore.ts       # Zustand state
-│   │   ├── App.tsx                # Root component
-│   │   └── index.css              # Tailwind styles
-│   ├── dist/                   # Production build
-│   ├── package.json            # Dependencies
-│   ├── tsconfig.json           # TypeScript config
-│   ├── tailwind.config.js      # Tailwind config
-│   └── vite.config.ts          # Vite config
-├── src/                        # Rust backend
+│   │   │   └── chatStore.ts        # Zustand state
+│   │   ├── assets/                 # Static assets
+│   │   ├── App.tsx                 # Root component
+│   │   ├── App.css                 # Component styles
+│   │   ├── index.css               # Global Tailwind styles
+│   │   └── main.tsx                # React entry point
+│   ├── public/                     # Public assets
+│   │   └── index.html              # HTML template
+│   ├── dist/                       # Production build (generated)
+│   ├── package.json                # NPM dependencies
+│   ├── tsconfig.json               # TypeScript config
+│   ├── tailwind.config.js          # Tailwind CSS config
+│   └── vite.config.ts              # Vite build config
+├── src/                            # Rust backend
 │   ├── bin/
-│   │   └── server.rs           # Entry point
-│   ├── config.rs               # Configuration
-│   ├── engine.rs               # Inference engine
-│   ├── engine_mock.rs          # Test mock
-│   ├── lib.rs                  # Library root
-│   ├── models.rs               # Data models
-│   ├── routes.rs               # HTTP handlers
-│   └── state.rs                # Application state
+│   │   └── server.rs               # Entry point with pre-warming
+│   ├── config.rs                   # TOML configuration loader
+│   ├── engine.rs                   # Inference engine adapter
+│   ├── engine_mock.rs              # Mock engine for testing
+│   ├── lib.rs                      # Library root
+│   ├── middleware.rs               # Rate limiter implementation
+│   ├── models.rs                   # Request/response data models
+│   ├── routes.rs                   # HTTP/WebSocket handlers
+│   └── state.rs                    # App state & SQLite session store
 ├── tests/
-│   ├── integration_tests.rs    # API tests
-│   ├── config_tests.rs         # Config tests
-│   └── middleware_tests.rs     # Middleware tests
+│   ├── integration_tests.rs        # API integration tests
+│   ├── config_tests.rs             # Config validation tests
+│   └── middleware_tests.rs         # Rate limiter tests
 ├── docs/
-│   ├── PROJECT_PROPOSAL.md     # PROJECT_PROPOSAL
-│   ├── API_REFERENCE.md        # API documentation
-|   └── PROJECT_DOCUMENTATION.md # Complete guide
-├── docker/
-│   ├── Dockerfile              # CPU build
-│   ├── Dockerfile.cuda         # GPU build
-│   ├── docker-compose.yml      # Orchestration
-│   ├── prometheus.yml          # Metrics config
-│   └── README.md               # Docker guide
-├── Cargo.toml                  # Rust dependencies
-├── config.example.toml         # Config template
-└── postman_collection.json     # API tests
+│   ├── API_REFERENCE.md            # API documentation
+│   ├── PROJECT_DOCUMENTATION.md    # Complete technical guide
+│   └── PROJECT_PROPOSAL.md         # Original project proposal
+├── scripts/
+│   └── test-rate-limit.ps1         # Rate limiting test script
+├── Cargo.toml                      # Rust dependencies & features
+├── config.toml                     # Runtime configuration
+├── config.example.toml             # Configuration template
+├── sessions.db                     # SQLite session database
+└── postman_collection.json         # Postman API tests
 ```
 
 ### Adding a New Model
@@ -340,26 +470,56 @@ context_length = 8192
 cargo build --release --features cuda
 ```
 
-**Metal Support (macOS)**:
-```bash
-cargo build --release --features metal
-```
-
-**Flash Attention**:
-```bash
-cargo build --release --features flash-attn
-```
-
 ---
 
 ## 📚 Additional Resources
 
 - **[API Reference](docs/API_REFERENCE.md)**: Complete endpoint documentation
 - **[Project Documentation](docs/PROJECT_DOCUMENTATION.md)**: Full setup and deployment guide
-- **[Docker Guide](docker/README.md)**: Container deployment instructions
 - **[Postman Collection](postman_collection.json)**: Ready-to-use API tests
 - **[mistral.rs](https://github.com/EricLBuehler/mistral.rs)**: Underlying inference engine
 - **[Candle](https://github.com/huggingface/candle)**: ML framework
+
+---
+
+## ❓ FAQ
+
+**Q: Can I use multiple GPUs?**  
+A: Currently, the service uses a single GPU. Set `CUDA_VISIBLE_DEVICES=0` to select which GPU to use.
+
+**Q: How much RAM/VRAM do I need?**  
+A: Depends on model size:
+- Qwen2.5-0.5B: ~2GB VRAM, 4GB RAM
+- Phi-3.5-mini: ~4GB VRAM, 8GB RAM
+- Larger models: Scale accordingly
+
+**Q: Can I use quantized models?**  
+A: Yes, configure in `config.toml`:
+```toml
+[[models.available_models]]
+id = "qwen-q4"
+name = "Qwen/Qwen2.5-0.5B-Instruct"
+quantization = "q4"
+```
+
+**Q: Do sessions expire?**  
+A: Sessions persist in SQLite. TTL is configured but not currently enforced. Sessions remain until explicitly deleted.
+
+**Q: Can I run without a GPU?**  
+A: Yes, omit the `--features cuda` flag:
+```bash
+cargo run --release --bin server
+```
+Models will run on CPU (slower performance).
+
+**Q: How do I backup sessions?**  
+A: Copy the SQLite database:
+```bash
+cp sessions.db sessions.db.backup
+```
+
+**Q: What's the difference between `/completions` and `/chat/completions`?**  
+A: `/completions` is for raw text completion. `/chat/completions` supports conversation history and session management.
 
 ---
 
