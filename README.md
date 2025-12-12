@@ -278,7 +278,7 @@ curl -X POST http://localhost:3000/completions \
 curl -X POST http://localhost:3000/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model_name": "qwen",
+    "model-name": "Qwen/Qwen2.5-0.5B-Instruct",
     "prompt": "What is async/await?",
     "max_token": 256,
     "temperature": 0.7,
@@ -527,6 +527,7 @@ cargo build --release --features cuda
     - Bootstrapped the Rust inference core and mistral.rs integration, then iterated on model loading and performance tuning.
     - Implemented production-grade persistence with the SQLite-backed session store and graceful deletion safeguards, plus improved engine resilience and canonical model resolution for pre-warming.
     - Coordinated backend branches and reconciled parallel workstreams to keep releases stable.
+    - Make the video demo.
 
 - **Kaicheng Xu (Systems / Platform)**
     - Delivered CUDA enablement, observability stack, and the initial session management pipeline that underpins the core features described above.
