@@ -10,6 +10,8 @@
 
 ## Video Slide Presentation
 [Click here]()
+[Slides here](https://docs.google.com/presentation/d/16AHN_hIZ5xZ8zSulIKaau9v__QWQE-O9hMCBX83Aaj0/edit?usp=sharing)
+
 
 ---
 
