@@ -1,17 +1,29 @@
 # 🚀 Rust LLM Inference Service
 
-A high-performance, production-ready Large Language Model (LLM) inference service built with Rust backend and React frontend. Provides OpenAI-compatible APIs with real-time token streaming, session management, and a modern web UI.
+**A high-performance, production-ready Large Language Model (LLM) inference service built with Rust backend and React frontend. Provides OpenAI-compatible APIs with real-time token streaming, session management, and a modern web UI.**
 
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/react-19.2.0-blue.svg)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.x-blue.svg)](https://www.typescriptlang.org/)
 
+---
+
 ## Video Slide Presentation
+[Click here]()
+
+---
 
 ## Video Demo
+[Click here]()
 
-## Contribution
-- **Zhiwen Yang** zhiwen.yang@mail.utoronto.ca
+---
+
+## Team Members
+- **Zhiwen Yang** 1002422853 zhiwen.yang@mail.utoronto.ca
+- **Ruijie Yao** 1010797853 chris.yao@mail.utoronto.ca
+- **Kaicheng Xu** 1005680452 kaicheng.xu@mail.utoronto.ca
+
+---
 
 ## 💡 Motivation
 
@@ -24,6 +36,8 @@ This project fills a critical gap in the Rust ecosystem by providing:
 - **Modern web UI** that rivals commercial LLM interfaces
 
 Our motivation was to prove that Rust can compete with established Python frameworks while offering better resource utilization, faster inference, and more reliable deployments—making LLMs accessible even on resource-constrained environments.
+
+---
 
 ## 🎯 Objectives
 
@@ -90,13 +104,13 @@ This project aims to achieve the following objectives:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                React Frontend (TypeScript)                  │
-│   Vite • Zustand • Tailwind CSS • React Markdown           │
+│   Vite • Zustand • Tailwind CSS • React Markdown            │
 │   WebSocket • Code Highlighting • Session Management        │
 └────────────────────────┬────────────────────────────────────┘
                          │ HTTP/WS
 ┌────────────────────────▼────────────────────────────────────┐
 │                    Axum Web Framework                       │
-│            Routes • Middleware • State Management            │
+│            Routes • Middleware • State Management           │
 ├─────────────────────────────────────────────────────────────┤
 │  Authentication  │  Rate Limiting  │  Content Validation    │
 ├─────────────────────────────────────────────────────────────┤
@@ -128,12 +142,12 @@ This project aims to achieve the following objectives:
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (User's Guide)
 
 ### Prerequisites
 - **Rust** 1.75+ (`rustup` recommended)
 - **Node.js** 18+ and npm (for frontend development)
-- **(Optional)** NVIDIA GPU + CUDA Toolkit 12.1+ for GPU acceleration
+- **(Optional)** NVIDIA GPU + CUDA Toolkit 12.1  (for GPU acceleration)
 
 ### Installation
 
@@ -158,16 +172,15 @@ cp config.example.toml config.toml
 ```
 
 4. **Run the service**:
-
-**CPU Mode**:
-```bash
-cargo run --release --bin server
-```
-
-**GPU Mode (CUDA)**:
-```bash
-cargo run --release --features cuda --bin server
-```
+    **CPU Mode**:
+    ```bash
+    cargo run --release --bin server
+    ```
+    
+    **GPU Mode (CUDA)**:
+    ```bash
+    cargo run --release --features cuda --bin server
+    ```
 
 5. **Access the web UI**:
 Open your browser to `http://localhost:3000`
@@ -506,6 +519,32 @@ context_length = 8192
 ```bash
 cargo build --release --features cuda
 ```
+
+---
+## Contributions
+
+- **Ruijie Yao (Backend / Infrastructure)**
+    - Bootstrapped the Rust inference core and mistral.rs integration, then iterated on model loading and performance tuning.
+    - Implemented production-grade persistence with the SQLite-backed session store and graceful deletion safeguards, plus improved engine resilience and canonical model resolution for pre-warming.
+    - Coordinated backend branches and reconciled parallel workstreams to keep releases stable.
+
+- **Kaicheng Xu (Systems / Platform)**
+    - Delivered CUDA enablement, observability stack, and the initial session management pipeline that underpins the core features described above.
+    - Added rate-limiting middleware, expanded automated tests, mock inference helpers, and stream APIs to harden the service surface.
+
+- **Zhiwen Yang (Frontend / Documentation)**
+  - Reorganized the monorepo layout and iterated on the React UI/UX, including the modern sidebar, export workflow, and logging guidance.
+  - Led the README/doc refresh cycles, ensuring the Quick Start, deployment, and configuration guidance reflect the current feature set.
+  - Maintained day-to-day polish on structure and wording, keeping the documentation aligned with ongoing work.
+
+---
+
+## Lessons Learned & Conclusion
+
+- **Rust for production inference**: Building a full-stack LLM service in Rust was viable but required careful ownership of async runtimes, memory usage, and third-party crates. In return, we gained predictable performance, strong typing across API layers, and simpler deployment once the core was stabilized.
+- **Observability early pays off**: Instrumentation, health probes, and rate limiting surfaced panic loops, runaway sessions, and frontend regressions before users felt them. Shipping with observability from day one reduced debugging overhead later.
+- **Tight frontend/backend feedback loop**: Keeping the React UI and Axum backend in sync via OpenAI-compatible contracts allowed both halves to iterate quickly without blocking each other, revealing API ergonomics issues early.
+- **Persistence evolution**: Moving from JSON files to SQLite persistence unlocked durability, editing, and rollback while remaining lightweight enough for both local and production use.
 
 ---
 
