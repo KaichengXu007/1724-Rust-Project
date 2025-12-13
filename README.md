@@ -9,14 +9,14 @@
 ---
 
 ## Video Slide Presentation
-- [Click here]()
+- [Click here](https://drive.google.com/file/d/1gky5eZChRLaweY1sr0TdLr-q5GzDoAmm/view?usp=sharing)
 - [Slides here](https://docs.google.com/presentation/d/16AHN_hIZ5xZ8zSulIKaau9v__QWQE-O9hMCBX83Aaj0/edit?usp=sharing)
 
 
 ---
 
 ## Video Demo
-[Click here]()
+[Click here](https://drive.google.com/file/d/1SbmaY_ff-S3ym5Y79mN0Mh8_FcAYDL4m/view?usp=sharing)
 
 ---
 
