@@ -377,6 +377,10 @@ curl http://localhost:3000/readiness
 
 ## 🔧 Troubleshooting
 
+### Code Compiling and Running Issues
+
+Note for Windows Users: If you encounter compilation errors related to cl.exe or link.exe inside VS Code, the environment variables might be missing. Please try running the commands in the x64 Native Tools Command Prompt for VS instead of the standard VS Code terminal.
+
 ### Model Download Issues
 
 Models are automatically downloaded from HuggingFace. If downloads fail:
